@@ -53,6 +53,7 @@ export type ChatReply = {
   answer: string;
   drafts: Draft[];
   citations: Citation[];
+  suggestions: string[];
   meta: {
     intent: string;
     model: string;

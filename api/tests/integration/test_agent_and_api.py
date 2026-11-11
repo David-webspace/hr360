@@ -67,6 +67,7 @@ def test_self_claimed_role_cannot_unlock_salary(db, as_user):
     row = audit_rows(db)[0]
     assert row["denied"] and row["deny_reason"] == "out_of_scope_or_not_found" and row["intent"] == "lookup.payroll"
     assert "角色：員工" in llm.calls[-1]["dynamic"]  # 身分來自登入，不是對話
+    assert r.suggestions == ["我上個月的薪資單", "薪資單上的勞保、健保怎麼算的？"]  # 被拒絕時改建議本人查得到的
 
 
 def test_fast_route_and_grounded_answer(db, as_user):
@@ -161,6 +162,19 @@ def test_admin_endpoints_need_sysadmin(client):
     assert "summary" in client.get("/api/admin/audit").json()
 
 
+def test_admin_audit_filters(client, db, as_user):
+    run_chat(db, FakeLLM([[("get_salary", {"employee": "王志明"})], "無法提供。"]), as_user("grace.lin"), "小王薪水多少？")
+    login(client, "sysadmin")
+    get = lambda **q: client.get("/api/admin/audit", params=q).json()["events"]  # noqa: E731
+    by_name = get(user="林佳穎", event="chat")
+    assert by_name and all(e["username"] == "grace.lin" and e["event"] == "chat" for e in by_name)
+    assert get(user="grace", event="chat") == by_name
+    flagged = get(flagged="true")
+    assert flagged and all(e["denied"] or e["grounding_ok"] is False for e in flagged)
+    assert all(e["intent"] == "lookup.payroll" for e in get(intent="lookup.payroll"))
+    assert get(user="%' OR 1=1 --") == []  # 篩選值走參數綁定
+
+
 def test_docs_disabled_by_default(client):
     assert client.get("/docs").status_code == 404
 
@@ -170,6 +184,16 @@ def test_nudge_when_model_skips_tool(db, as_user):
     r = run_chat(db, llm, as_user("grace.lin"), "我今年還剩幾天特休？")
     assert r.tools[0]["name"] == "get_leave_balance" and r.grounding_ok
     assert "+nudge" in audit_rows(db)[0]["routed_by"]
+
+
+def test_nudge_when_leave_request_only_checks_balance(db, as_user):
+    llm = FakeLLM([[("get_leave_balance", {})], "你特休可用 13 小時，請問要請哪一天？",
+                   [("draft_leave_request", {"leave_type": "annual", "start": "2026-11-16", "end": "2026-11-16"})],
+                   "已建立 2026-11-16 特休草稿，請在卡片上按「確認送出」。"])
+    r = run_chat(db, llm, as_user("grace.lin"), "幫我請下週一的特休")
+    assert r.drafts and str(r.drafts[0]["start"]).startswith("2026-11-16")
+    assert "+nudge" in audit_rows(db)[0]["routed_by"]
+    assert "下週：週一 2026-11-16" in llm.calls[0]["dynamic"]  # 相對日期由程式換算後給模型
 
 
 def test_claimed_draft_without_tool_is_blocked(db, as_user):

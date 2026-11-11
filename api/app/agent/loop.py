@@ -13,6 +13,7 @@ from app.agent.grounding import ungrounded
 from app.agent.llm import LLMClient, Usage
 from app.agent.prompts import SYSTEM_STATIC, system_dynamic
 from app.agent.router import Route, fixed, model_for, route
+from app.agent.suggest import suggest
 from app.agent.tools import TOOLS, ToolContext, ToolOutcome, run_tool, specs
 from app.auth import Principal
 from app.config import today
@@ -52,6 +53,7 @@ class ChatResult:
     routed_by: str
     grounding_ok: bool
     escalated: bool
+    suggestions: list[str]
     usage: Usage
     cost_usd: float | None
     latency_ms: int
@@ -128,7 +130,10 @@ def _attempt(client: LLMClient, ctx: ToolContext, model: str, alias: str, dyn: s
             a.answer = REFUSAL_TEXT
             return a
         if not r.tool_calls:
-            if not a.outcomes and not nudged and intent in EXPECTED_TOOL:
+            # 請假意圖只查了餘額就收尾，小模型常見：沒建草稿卻寫得像請好了，同樣提醒一次
+            skipped = not a.outcomes or (intent == "action.leave_request"
+                                         and not any(o.name == "draft_leave_request" for o in a.outcomes))
+            if skipped and not nudged and intent in EXPECTED_TOOL:
                 nudged = a.nudged = True
                 # 丟掉這次沒查資料的回答，改在使用者問題後面加一則系統訊息再答一次；
                 # 用 system 角色而不是 user，模型才不會把提醒當成使用者的話來回覆
@@ -154,7 +159,7 @@ def run_chat(db: Session, client: LLMClient, p: Principal, question: str, conver
     cid = _conversation(db, p, conversation_id, question)
     me = db.execute(text("""SELECT o.name, e.title FROM employees e JOIN org_units o ON o.id = e.org_unit_id
                             WHERE e.id = :e"""), {"e": p.emp_id or -1}).one_or_none()
-    dyn = system_dynamic(p, today().isoformat(), me[0] if me else None, me[1] if me else None)
+    dyn = system_dynamic(p, today(), me[0] if me else None, me[1] if me else None)
     history = _history(db, client, cid)
     new_ids = [a["id"] for a in attachments.owned(db, p, attachment_ids or [])]
     docs, vision_usage = _documents(db, client, p, cid, new_ids)
@@ -224,5 +229,5 @@ def run_chat(db: Session, client: LLMClient, p: Principal, question: str, conver
         conversation_id=cid, answer=final.answer,
         drafts=drafts, citations=citations, tools=tool_view,
         intent=rt.intent, model=final.model, routed_by=rt.routed_by, grounding_ok=not bad, escalated=escalated,
-        usage=total, cost_usd=cost, latency_ms=latency,
+        suggestions=suggest(question, rt.intent, tool_view, drafts, p), usage=total, cost_usd=cost, latency_ms=latency,
     )

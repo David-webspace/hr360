@@ -6,7 +6,7 @@ import type { AttachmentRef, ChatReply, Citation, ConversationSummary, Draft, Hi
 
 export type Turn =
   | { role: "user"; text: string; images: string[] }
-  | { role: "assistant"; text: string; drafts: Draft[]; citations: Citation[]; tools: ToolUse[]; latencyMs?: number; groundingOk: boolean }
+  | { role: "assistant"; text: string; drafts: Draft[]; citations: Citation[]; tools: ToolUse[]; latencyMs?: number; groundingOk: boolean; suggestions?: string[] }
   | { role: "error"; text: string };
 
 type ChatState = {
@@ -149,7 +149,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     setConversationId(r.conversation_id);
     setTurns((t) => [...t, {
       role: "assistant", text: r.answer, drafts: r.drafts, citations: r.citations, tools: r.meta.tools,
-      latencyMs: r.meta.latency_ms, groundingOk: r.meta.grounding_ok,
+      latencyMs: r.meta.latency_ms, groundingOk: r.meta.grounding_ok, suggestions: r.suggestions,
     }]);
     void refreshList();
   }, [busy, conversationId, refreshList]);

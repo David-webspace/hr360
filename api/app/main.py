@@ -2,7 +2,7 @@ import logging
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 
-from fastapi import Depends, FastAPI, HTTPException, Request, Response
+from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import text
@@ -123,7 +123,7 @@ def chat(body: ChatIn, p: Principal = Depends(current_principal), db: Session = 
         log.exception("chat failed")
         raise HTTPException(503, "HR 助理暫時無法回應，請稍後再試")
     return {"conversation_id": r.conversation_id, "answer": r.answer, "drafts": r.drafts, "citations": r.citations,
-            "meta": {"intent": r.intent, "model": r.model, "routed_by": r.routed_by, "grounding_ok": r.grounding_ok,
+            "suggestions": r.suggestions, "meta": {"intent": r.intent, "model": r.model, "routed_by": r.routed_by, "grounding_ok": r.grounding_ok,
                      "escalated": r.escalated, "tools": r.tools, "latency_ms": r.latency_ms, "cost_usd": r.cost_usd,
                      "tokens": vars(r.usage)}}
 
@@ -232,13 +232,30 @@ def ticket_list(p: Principal = Depends(current_principal), db: Session = Depends
 
 
 @app.get("/api/admin/audit")
-def audit_log(_: Principal = Depends(require_role("sysadmin")), db: Session = Depends(get_db)) -> dict:
-    rows = db.execute(text("""
-        SELECT a.ts, u.username, a.roles, a.channel, a.event, a.question, a.intent, a.model, a.routed_by, a.tools,
+def audit_log(event: str | None = Query(None, max_length=40), user: str | None = Query(None, max_length=40),
+              intent: str | None = Query(None, max_length=40), flagged: bool = False,
+              _: Principal = Depends(require_role("sysadmin")), db: Session = Depends(get_db)) -> dict:
+    # 篩選條件全部走參數綁定；帳號欄同時比對帳號與姓名，方便用中文名字找人
+    where, params = [], {}
+    if event:
+        where.append("a.event = :event")
+        params["event"] = event
+    if intent:
+        where.append("a.intent = :intent")
+        params["intent"] = intent
+    if user:
+        where.append("(u.username ILIKE :user OR e.name ILIKE :user)")
+        params["user"] = f"%{user.strip()}%"
+    if flagged:
+        where.append("(a.denied OR a.grounding_ok = false)")
+    rows = db.execute(text(f"""
+        SELECT a.ts, u.username, e.name, a.roles, a.channel, a.event, a.question, a.intent, a.model, a.routed_by, a.tools,
                a.denied, a.deny_reason, a.input_tokens, a.output_tokens, a.cache_read_tokens, a.cache_write_tokens,
                a.cost_usd, a.latency_ms, a.grounding_ok
-        FROM audit_log a LEFT JOIN users u ON u.id = a.user_id ORDER BY a.id DESC LIMIT 200
-    """)).mappings().all()
+        FROM audit_log a LEFT JOIN users u ON u.id = a.user_id LEFT JOIN employees e ON e.id = u.employee_id
+        {"WHERE " + " AND ".join(where) if where else ""}
+        ORDER BY a.id DESC LIMIT 200
+    """), params).mappings().all()
     summary = db.execute(text("""
         SELECT model, COUNT(*) AS n, AVG(input_tokens + cache_read_tokens + cache_write_tokens)::int AS avg_input,
                AVG(output_tokens)::int AS avg_output, AVG(latency_ms)::int AS avg_latency_ms, SUM(cost_usd) AS cost_usd,

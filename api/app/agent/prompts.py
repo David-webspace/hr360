@@ -1,3 +1,5 @@
+from datetime import date, timedelta
+
 from app.auth import Principal
 
 ROLE_LABEL = {"employee": "員工", "manager": "主管", "hrbp": "HRBP", "payroll": "薪酬人員", "sysadmin": "系統管理員"}
@@ -17,6 +19,7 @@ SYSTEM_STATIC = """你是曜川科技的 HR 助理，用繁體中文（台灣用
 - 薪資、加班費金額、保費屬機密。工具成功回傳資料，就代表目前使用者有權限查看（例如本人、薪酬人員），照實回答；只有工具回傳無權限時才說無法提供。
 
 請假
+- 「明天」「下週一」這類相對日期，直接採用下方「日期對照」的日期，不要反問；對照表沒有的說法才問清楚。
 - 使用者要請假時，資訊不足（假別、日期、時段）先問清楚，再呼叫 draft_leave_request。
 - draft_leave_request 只會建立草稿；回覆時說明時數與餘額變化，並提醒使用者在畫面上的草稿卡片按「確認送出」，送出後才進入主管簽核。不要說「已幫你請好假」。
 
@@ -33,10 +36,24 @@ SYSTEM_STATIC = """你是曜川科技的 HR 助理，用繁體中文（台灣用
 - 先給結論，再列依據，簡潔，不寒暄，不加表情符號。"""
 
 
-def system_dynamic(p: Principal, today: str, unit: str | None, title: str | None) -> str:
+WEEKDAY = "一二三四五六日"
+
+
+def date_table(today: date) -> str:
+    # 相對日期由程式換算：小模型自己推星期幾常算錯或乾脆反問，數字規則也禁止模型自行計算日期
+    def d(x: date) -> str:
+        return f"{x.isoformat()}（週{WEEKDAY[x.weekday()]}）"
+    monday = today - timedelta(days=today.weekday())
+    def week(start: date) -> str:
+        return "、".join(f"週{WEEKDAY[i]} {(start + timedelta(days=i)).isoformat()}" for i in range(7))
+    return (f"今天 {d(today)}；明天 {d(today + timedelta(days=1))}；後天 {d(today + timedelta(days=2))}\n"
+            f"本週：{week(monday)}\n下週：{week(monday + timedelta(days=7))}")
+
+
+def system_dynamic(p: Principal, today: date, unit: str | None, title: str | None) -> str:
     roles = "、".join(ROLE_LABEL.get(r, r) for r in sorted(p.roles))
     who = f"{p.name}（{unit or '無所屬單位'}／{title or '—'}）" if p.emp_id else p.username
-    return f"今天日期：{today}\n目前使用者（系統登入驗證）：{who}；角色：{roles}"
+    return f"日期對照：\n{date_table(today)}\n目前使用者（系統登入驗證）：{who}；角色：{roles}"
 
 
 ROUTER_PROMPT = """把使用者的人事問題分類，只輸出一個標籤，不要其他文字：

@@ -11,6 +11,8 @@ const MAX_FILES = 3;
 
 type Pending = { file: File; url: string };
 
+const CHIP = "rounded-full border border-rule bg-sheet px-3 py-1.5 text-sm hover:border-river hover:text-river";
+
 function suggestionsFor(isManager: boolean): string[] {
   const base = ["我今年還剩多少特休？", "我上個月加班費怎麼算？", "幫我請下週一的特休", "育嬰留停要準備什麼？"];
   if (isManager) base.splice(2, 0, "我的團隊這一季誰請最多假？");
@@ -99,7 +101,7 @@ export function AiPanel() {
               <p className="text-sm text-muted">有診斷證明、訃聞或結婚證書？拍照附上，助理會讀出日期並幫你建立假單草稿。</p>
               <div className="flex flex-wrap gap-2">
                 {suggestionsFor(Boolean(me?.is_manager)).map((s) => (
-                  <button key={s} onClick={() => void send(s)} className="rounded-full border border-rule bg-sheet px-3 py-1.5 text-sm hover:border-river hover:text-river">{s}</button>
+                  <button key={s} onClick={() => void send(s)} className={CHIP}>{s}</button>
                 ))}
               </div>
             </div>
@@ -117,7 +119,16 @@ export function AiPanel() {
             ) : t.role === "error" ? (
               <p key={i} role="alert" className="border-l-2 border-seal pl-3 text-sm text-seal">{t.text}</p>
             ) : (
-              <div key={i} className="text-sm"><AiReply t={t} name={name} /></div>
+              <div key={i} className="space-y-2 text-sm">
+                <AiReply t={t} name={name} />
+                {i === turns.length - 1 && !busy && t.suggestions && t.suggestions.length > 0 && (
+                  <div aria-label="接著問" className="flex flex-wrap gap-2 pl-3">
+                    {t.suggestions.map((s) => (
+                      <button key={s} onClick={() => void send(s)} className={`${CHIP} min-w-0 text-left break-words`}>{s}</button>
+                    ))}
+                  </div>
+                )}
+              </div>
             ),
           )}
           {busy && <p className="animate-pulse pl-3 text-sm text-muted motion-reduce:animate-none">{busyText}</p>}
