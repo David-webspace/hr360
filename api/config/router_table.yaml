@@ -1,0 +1,103 @@
+# 由 python -m app.evals.run --write-router 產生，請勿手改 routes 以外的欄位
+version: eval-20261111-0044
+source: eval/results/summary-20261111-0044.json
+rule: 每個意圖選通過率 100%、零洩漏、且至少 3 題的最便宜模型；否則 strong
+routes:
+  action.leave_request: fast
+  analysis.team: strong
+  escalate: strong
+  lookup.benefits: strong
+  lookup.leave_balance: fast
+  lookup.overtime_pay: fast
+  lookup.payroll: fast
+  policy.qa: fast
+  other: strong
+evidence:
+  action.leave_request:
+    fast:
+      cases: 6
+      n: 12
+      pass_rate: 1.0
+      avg_cost_usd: 0.000447
+    strong:
+      cases: 6
+      n: 12
+      pass_rate: 1.0
+      avg_cost_usd: 0.008556
+  analysis.team:
+    fast:
+      cases: 2
+      n: 4
+      pass_rate: 1.0
+      avg_cost_usd: 0.000378
+    strong:
+      cases: 2
+      n: 4
+      pass_rate: 1.0
+      avg_cost_usd: 0.006148
+  escalate:
+    fast:
+      cases: 2
+      n: 4
+      pass_rate: 1.0
+      avg_cost_usd: 0.000565
+    strong:
+      cases: 2
+      n: 4
+      pass_rate: 1.0
+      avg_cost_usd: 0.009909
+  lookup.benefits:
+    fast:
+      cases: 1
+      n: 2
+      pass_rate: 1.0
+      avg_cost_usd: 0.000228
+    strong:
+      cases: 1
+      n: 2
+      pass_rate: 1.0
+      avg_cost_usd: 0.004397
+  lookup.leave_balance:
+    fast:
+      cases: 8
+      n: 16
+      pass_rate: 1.0
+      avg_cost_usd: 0.000401
+    strong:
+      cases: 8
+      n: 16
+      pass_rate: 1.0
+      avg_cost_usd: 0.006494
+  lookup.overtime_pay:
+    fast:
+      cases: 3
+      n: 6
+      pass_rate: 1.0
+      avg_cost_usd: 0.000414
+    strong:
+      cases: 3
+      n: 6
+      pass_rate: 1.0
+      avg_cost_usd: 0.00715
+  lookup.payroll:
+    fast:
+      cases: 9
+      n: 18
+      pass_rate: 1.0
+      avg_cost_usd: 0.000394
+    strong:
+      cases: 9
+      n: 18
+      pass_rate: 1.0
+      avg_cost_usd: 0.005159
+  policy.qa:
+    fast:
+      cases: 7
+      n: 14
+      pass_rate: 1.0
+      avg_cost_usd: 0.000416
+    strong:
+      cases: 7
+      n: 14
+      pass_rate: 1.0
+      avg_cost_usd: 0.007224

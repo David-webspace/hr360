@@ -1,0 +1,4 @@
+# Windows 上 clone 時 Git 預設會把換行轉成 CRLF；shell script 帶 CRLF 會在容器內執行失敗，一律保持 LF
+*.sh text eol=lf
+Makefile text eol=lf
+*.ps1 text eol=crlf

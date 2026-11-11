@@ -1,0 +1,60 @@
+@import "tailwindcss";
+@import "@fontsource/lxgw-wenkai-tc/400.css";
+@import "@fontsource/lxgw-wenkai-tc/700.css";
+@import "@fontsource/ibm-plex-mono/400.css";
+@import "@fontsource/ibm-plex-mono/500.css";
+
+/* 曜川科技 HR：紙本假單與假勤帳本的視覺語彙 */
+@theme {
+  --color-paper: #f3f5f7;   /* 公文紙：冷調灰白，不是米色 */
+  --color-sheet: #ffffff;   /* 單據本身 */
+  --color-ink: #1b2430;     /* 墨 */
+  --color-muted: #5b6675;
+  --color-rule: #cbd3dc;    /* 表格格線 */
+  --color-river: #146b6f;   /* 川：主色 */
+  --color-river-deep: #0d4f52;
+  --color-river-wash: #e3efef;
+  --color-glow: #f2b544;    /* 曜：待處理提醒 */
+  --color-glow-wash: #fdf3dc;
+  --color-seal: #c2412d;    /* 印：只用在簽核章與拒絕 */
+
+  --font-display: "LXGW WenKai TC", "Kaiti TC", "DFKai-SB", serif;
+  --font-sans: "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+}
+
+html {
+  background: var(--color-paper);
+  color: var(--color-ink);
+}
+
+body {
+  font-family: var(--font-sans);
+  background: var(--color-paper);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-river);
+  outline-offset: 2px;
+}
+
+/* 數字一律等寬，帳本對得齊 */
+.num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 簽核章蓋下去的動作 */
+@keyframes stamp {
+  0% { transform: scale(1.8) rotate(-18deg); opacity: 0; }
+  60% { transform: scale(0.92) rotate(-8deg); opacity: 1; }
+  100% { transform: scale(1) rotate(-8deg); opacity: 1; }
+}
+
+.stamp-in {
+  animation: stamp 420ms cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stamp-in { animation: none; transform: rotate(-8deg); }
+}
