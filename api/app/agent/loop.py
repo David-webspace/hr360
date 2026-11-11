@@ -1,5 +1,6 @@
 """問答 Agent：分流 → tool-use 迴圈 → 數字檢查（必要時升級 strong 重答）→ 存對話（只存文字）→ 稽核。"""
 
+import json
 import time
 from collections import defaultdict
 from dataclasses import dataclass, field
@@ -148,8 +149,15 @@ def run_chat(db: Session, client: LLMClient, p: Principal, question: str, conver
     elif bad:
         final.answer += UNVERIFIED_NOTE
 
-    db.execute(text("INSERT INTO messages (conversation_id, role, text) VALUES (:c, 'user', :q), (:c, 'assistant', :a)"),
-               {"c": cid, "q": question, "a": final.answer})
+    drafts = [o.result for o in final.outcomes if o.name == "draft_leave_request" and "draft_id" in o.result]
+    citations = [{"source": x["source"], "section": x["section"], "version": x["version"]}
+                 for o in final.outcomes if o.name == "search_policy" for x in o.result.get("results", [])]
+    tool_view = [{"name": o.name, "denied": o.denied, "error": o.error} for o in final.outcomes]
+    view = {"drafts": drafts, "citations": citations, "tools": tool_view, "grounding_ok": not bad,
+            "latency_ms": int((time.monotonic() - t0) * 1000)}
+    db.execute(text("""INSERT INTO messages (conversation_id, role, text, meta)
+                       VALUES (:c, 'user', :q, NULL), (:c, 'assistant', :a, CAST(:m AS jsonb))"""),
+               {"c": cid, "q": question, "a": final.answer, "m": json.dumps(view, ensure_ascii=False, default=str)})
     db.commit()
 
     total = Usage()
@@ -169,10 +177,7 @@ def run_chat(db: Session, client: LLMClient, p: Principal, question: str, conver
                 latency_ms=latency, grounding_ok=not bad, conversation_id=cid)
     return ChatResult(
         conversation_id=cid, answer=final.answer,
-        drafts=[o.result for o in final.outcomes if o.name == "draft_leave_request" and "draft_id" in o.result],
-        citations=[{"source": x["source"], "section": x["section"], "version": x["version"]}
-                   for o in final.outcomes if o.name == "search_policy" for x in o.result.get("results", [])],
-        tools=[{"name": o.name, "denied": o.denied, "error": o.error} for o in final.outcomes],
+        drafts=drafts, citations=citations, tools=tool_view,
         intent=rt.intent, model=final.model, routed_by=rt.routed_by, grounding_ok=not bad, escalated=escalated,
         usage=total, cost_usd=cost, latency_ms=latency,
     )

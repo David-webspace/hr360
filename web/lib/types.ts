@@ -11,6 +11,7 @@ export type Me = {
 
 export type Draft = {
   draft_id: number;
+  employee?: string;
   leave_type: string;
   leave_name: string;
   start: string;
@@ -24,6 +25,17 @@ export type Draft = {
 };
 
 export type Citation = { source: string; section: string; version: string };
+
+export type ToolUse = { name: string; denied: boolean; error: boolean };
+
+// 對話紀錄還原用：meta 只在助理回覆上有
+export type HistoryMessage = {
+  role: "user" | "assistant";
+  text: string;
+  meta: { drafts: Draft[]; citations: Citation[]; tools: ToolUse[]; grounding_ok: boolean; latency_ms: number } | null;
+};
+
+export type ConversationSummary = { id: number; title: string | null; last_at: string };
 
 export type ChatReply = {
   conversation_id: number;

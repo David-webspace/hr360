@@ -147,7 +147,7 @@ def draft(db: Session, p: Principal, leave_type: str, start: str, end: str, reas
            "via": "chat" if p.channel == "web" else p.channel}).scalar_one()
     db.commit()
     approver = db.execute(text("SELECT name FROM employees WHERE id = :i"), {"i": e["manager_id"]}).scalar()
-    card = {"draft_id": rid, "leave_type": leave_type, "leave_name": leave_name(leave_type),
+    card = {"draft_id": rid, "employee": e["name"], "leave_type": leave_type, "leave_name": leave_name(leave_type),
             "start": s.isoformat(timespec="minutes"), "end": t.isoformat(timespec="minutes"),
             "hours": num(info["hours"]), "approver": approver, "warnings": info["warnings"],
             "status": "draft", "next_step": "草稿已建立，請本人在畫面上按「確認送出」，送出後才會進入主管簽核"}

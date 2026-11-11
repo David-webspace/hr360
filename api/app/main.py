@@ -121,16 +121,28 @@ def chat(body: ChatIn, p: Principal = Depends(current_principal), db: Session = 
 
 @app.get("/api/conversations")
 def conversations(p: Principal = Depends(current_principal), db: Session = Depends(get_db)) -> list[dict]:
-    rows = db.execute(text("SELECT id, title, created_at FROM conversations WHERE user_id = :u ORDER BY id DESC LIMIT 30"),
-                      {"u": p.user_id}).mappings().all()
+    rows = db.execute(text("""
+        SELECT c.id, c.title, COALESCE(MAX(m.created_at), c.created_at) AS last_at
+        FROM conversations c LEFT JOIN messages m ON m.conversation_id = c.id
+        WHERE c.user_id = :u GROUP BY c.id ORDER BY last_at DESC LIMIT 10
+    """), {"u": p.user_id}).mappings().all()
     return [dict(r) for r in rows]
 
 
 @app.get("/api/conversations/{cid}/messages")
 def conversation_messages(cid: int, p: Principal = Depends(current_principal), db: Session = Depends(get_db)) -> list[dict]:
-    rows = db.execute(text("""SELECT m.role, m.text, m.created_at FROM messages m JOIN conversations c ON c.id = m.conversation_id
-                              WHERE c.id = :c AND c.user_id = :u ORDER BY m.id"""), {"c": cid, "u": p.user_id}).mappings().all()
-    return [dict(r) for r in rows]
+    rows = [dict(r) for r in db.execute(text("""
+        SELECT m.role, m.text, m.meta, m.created_at FROM messages m JOIN conversations c ON c.id = m.conversation_id
+        WHERE c.id = :c AND c.user_id = :u ORDER BY m.id"""), {"c": cid, "u": p.user_id}).mappings().all()]
+    # 草稿卡片要顯示「現在」的狀態（可能已送出、核准或取消），不是建立當下的狀態
+    ids = [d["draft_id"] for r in rows if r["meta"] for d in r["meta"].get("drafts", [])]
+    if ids:
+        status = dict(db.execute(text("SELECT id, status FROM leave_requests WHERE id = ANY(:ids) AND emp_id = :me"),
+                                 {"ids": ids, "me": p.emp_id or -1}).all())
+        for r in rows:
+            for d in (r["meta"] or {}).get("drafts", []):
+                d["status"] = status.get(d["draft_id"], d["status"])
+    return rows
 
 
 @app.get("/api/leave/balance")

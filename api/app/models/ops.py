@@ -48,7 +48,9 @@ class Message(Base, Timestamped):
     id: Mapped[int] = mapped_column(primary_key=True)
     conversation_id: Mapped[int] = mapped_column(ForeignKey("conversations.id", ondelete="CASCADE"), index=True)
     role: Mapped[str] = mapped_column(String(16))  # user / assistant
-    text: Mapped[str] = mapped_column(Text)  # 只存文字，不存工具原始輸出
+    text: Mapped[str] = mapped_column(Text)  # 給模型的對話記憶只用這欄文字，不含工具原始輸出
+    # 只給畫面還原用（請假單卡片、出處、耗時），不會送回模型
+    meta: Mapped[dict | None] = mapped_column(JSONB)
 
 
 class Ticket(Base, Timestamped):

@@ -174,8 +174,8 @@ class OpenAICompatibleClient:
         return {"role": "assistant", "content": text}
 
     def system_note(self, text: str) -> dict:
-        # Claude 5.5 系列支援對話中的 system 訊息（須接在 user 訊息之後）
-        return {"role": "system", "content": text}
+        # 開源模型（例如 Ollama 的 qwen）常忽略對話中途的 system 訊息，改用 user 角色並標明是系統提示
+        return {"role": "user", "content": f"（系統提示，非使用者發言）{text}"}
 
     def tool_results(self, results) -> list:
         return [{"role": "tool", "tool_call_id": c.id, "content": out} for c, out, _ in results]

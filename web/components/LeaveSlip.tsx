@@ -17,6 +17,7 @@ type Props = {
   balance?: { before: number; after: number };
   warnings?: string[];
   reason?: string | null;
+  initialStatus?: string;
 };
 
 async function post(path: string, body?: unknown): Promise<string | null> {
@@ -32,7 +33,7 @@ async function post(path: string, body?: unknown): Promise<string | null> {
 
 export function LeaveSlip(p: Props) {
   const router = useRouter();
-  const [status, setStatus] = useState(p.mode === "draft" ? "draft" : "pending");
+  const [status, setStatus] = useState(p.initialStatus ?? (p.mode === "draft" ? "draft" : "pending"));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -76,7 +77,7 @@ export function LeaveSlip(p: Props) {
           ))}
         </dl>
         <div className="flex shrink-0 flex-col gap-3">
-          <Seal name={p.employee} label="本人" stamped={selfStamped} animate={p.mode === "draft"} />
+          <Seal name={p.employee} label="本人" stamped={selfStamped} animate={p.mode === "draft" && !p.initialStatus} />
           <Seal name={p.approver ?? "主管"} label="主管" stamped={bossStamped} animate />
         </div>
       </div>

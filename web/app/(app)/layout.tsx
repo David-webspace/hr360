@@ -1,4 +1,7 @@
 import { Suspense } from "react";
+import { AiFab, AiTopBar } from "@/components/ai/AiButtons";
+import { AiPanel } from "@/components/ai/AiPanel";
+import { ChatProvider } from "@/components/ai/ChatProvider";
 import { Brand, Nav } from "@/components/Nav";
 import { apiGet } from "@/lib/api";
 import type { Me } from "@/lib/types";
@@ -17,13 +20,21 @@ function NavSkeleton() {
   );
 }
 
+// 聊天狀態放在所有頁面共用的外框：換頁時這一層不會重新掛載，對話與進行中的請求都會保留
 export default function AppLayout({ children }: LayoutProps<"/">) {
   return (
-    <div className="mx-auto flex min-h-dvh max-w-6xl">
-      <Suspense fallback={<NavSkeleton />}>
-        <UserNav />
-      </Suspense>
-      <main className="min-w-0 flex-1 px-4 pt-6 pb-24 md:px-8 md:pb-6">{children}</main>
-    </div>
+    <ChatProvider>
+      <div className="flex min-h-dvh">
+        <Suspense fallback={<NavSkeleton />}>
+          <UserNav />
+        </Suspense>
+        <div className="flex min-w-0 flex-1 flex-col">
+          <AiTopBar />
+          <main className="mx-auto w-full max-w-5xl min-w-0 flex-1 px-4 pt-6 pb-24 md:px-8 md:pt-0 md:pb-8">{children}</main>
+        </div>
+        <AiPanel />
+      </div>
+      <AiFab />
+    </ChatProvider>
   );
 }

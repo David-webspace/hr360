@@ -197,3 +197,20 @@ def test_unknown_provider_reported():
         assert "不支援" in not_configured()
     finally:
         s.llm_provider = old
+
+
+def test_history_restores_cards_with_current_status(client, db, as_user):
+    p = as_user("grace.lin")
+    llm = FakeLLM([[("draft_leave_request", {"leave_type": "annual", "start": "2026-11-12", "end": "2026-11-12"})], "已建立草稿，請按確認送出。"])
+    r = run_chat(db, llm, p, "幫我請 2026-11-12 的特休")
+    did = r.drafts[0]["draft_id"]
+    login(client, "grace.lin")
+    assert client.post(f"/api/leave/requests/{did}/submit").json()["status"] == "pending"
+    convs = client.get("/api/conversations").json()
+    assert convs[0]["id"] == r.conversation_id
+    msgs = client.get(f"/api/conversations/{r.conversation_id}/messages").json()
+    assert [m["role"] for m in msgs] == ["user", "assistant"]
+    card = msgs[1]["meta"]["drafts"][0]
+    assert card["draft_id"] == did and card["status"] == "pending"  # 重新載入時顯示目前狀態，不是當時的草稿
+    login(client, "jason.wang")
+    assert client.get(f"/api/conversations/{r.conversation_id}/messages").json() == []  # 別人的對話讀不到

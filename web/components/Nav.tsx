@@ -11,7 +11,7 @@ export function navItems(me: Me): Item[] {
     return [{ href: "/admin", label: "稽核" }, { href: "/tickets", label: "工單" }];
   }
   const items: Item[] = [
-    { href: "/", label: "助理" },
+    { href: "/", label: "總覽" },
     { href: "/leave", label: "假勤" },
     { href: "/payslip", label: "薪資" },
   ];
