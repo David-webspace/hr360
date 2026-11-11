@@ -1,103 +1,127 @@
 # 由 python -m app.evals.run --write-router 產生，請勿手改 routes 以外的欄位
-version: eval-20261111-0044
-source: eval/results/summary-20261111-0044.json
+version: eval-20261111-2229
+source: eval/results/summary-20261111-2229.json
 rule: 每個意圖選通過率 100%、零洩漏、且至少 3 題的最便宜模型；否則 strong
 routes:
   action.leave_request: fast
   analysis.team: strong
+  audit.stats: strong
   escalate: strong
   lookup.benefits: strong
   lookup.leave_balance: fast
   lookup.overtime_pay: fast
   lookup.payroll: fast
   policy.qa: fast
+  report.export: fast
   other: strong
 evidence:
   action.leave_request:
     fast:
-      cases: 6
-      n: 12
+      cases: 12
+      n: 24
       pass_rate: 1.0
-      avg_cost_usd: 0.000447
+      avg_cost_usd: 0.000643
     strong:
-      cases: 6
-      n: 12
+      cases: 12
+      n: 24
       pass_rate: 1.0
-      avg_cost_usd: 0.008556
+      avg_cost_usd: 0.009372
   analysis.team:
     fast:
       cases: 2
       n: 4
       pass_rate: 1.0
-      avg_cost_usd: 0.000378
+      avg_cost_usd: 0.000394
     strong:
       cases: 2
       n: 4
       pass_rate: 1.0
-      avg_cost_usd: 0.006148
+      avg_cost_usd: 0.007046
+  audit.stats:
+    fast:
+      cases: 1
+      n: 2
+      pass_rate: 1.0
+      avg_cost_usd: 0.000394
+    strong:
+      cases: 1
+      n: 2
+      pass_rate: 1.0
+      avg_cost_usd: 0.006127
   escalate:
     fast:
       cases: 2
       n: 4
       pass_rate: 1.0
-      avg_cost_usd: 0.000565
+      avg_cost_usd: 0.00064
     strong:
       cases: 2
       n: 4
       pass_rate: 1.0
-      avg_cost_usd: 0.009909
+      avg_cost_usd: 0.009717
   lookup.benefits:
     fast:
       cases: 1
       n: 2
       pass_rate: 1.0
-      avg_cost_usd: 0.000228
+      avg_cost_usd: 0.000276
     strong:
       cases: 1
       n: 2
       pass_rate: 1.0
-      avg_cost_usd: 0.004397
+      avg_cost_usd: 0.005406
   lookup.leave_balance:
     fast:
       cases: 8
       n: 16
       pass_rate: 1.0
-      avg_cost_usd: 0.000401
+      avg_cost_usd: 0.000537
     strong:
       cases: 8
       n: 16
       pass_rate: 1.0
-      avg_cost_usd: 0.006494
+      avg_cost_usd: 0.009134
   lookup.overtime_pay:
     fast:
       cases: 3
       n: 6
       pass_rate: 1.0
-      avg_cost_usd: 0.000414
+      avg_cost_usd: 0.000532
     strong:
       cases: 3
       n: 6
       pass_rate: 1.0
-      avg_cost_usd: 0.00715
+      avg_cost_usd: 0.008237
   lookup.payroll:
     fast:
       cases: 9
       n: 18
       pass_rate: 1.0
-      avg_cost_usd: 0.000394
+      avg_cost_usd: 0.000389
     strong:
       cases: 9
       n: 18
       pass_rate: 1.0
-      avg_cost_usd: 0.005159
+      avg_cost_usd: 0.005713
   policy.qa:
     fast:
       cases: 7
       n: 14
       pass_rate: 1.0
-      avg_cost_usd: 0.000416
+      avg_cost_usd: 0.000433
     strong:
       cases: 7
       n: 14
       pass_rate: 1.0
-      avg_cost_usd: 0.007224
+      avg_cost_usd: 0.007585
+  report.export:
+    fast:
+      cases: 4
+      n: 8
+      pass_rate: 1.0
+      avg_cost_usd: 0.000476
+    strong:
+      cases: 4
+      n: 8
+      pass_rate: 1.0
+      avg_cost_usd: 0.008051

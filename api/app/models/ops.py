@@ -1,7 +1,7 @@
 from datetime import date, datetime
 
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Index, Integer, Numeric, String, Text, func
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Index, Integer, LargeBinary, Numeric, String, Text, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -112,3 +112,18 @@ class EvalRun(Base, Timestamped):
     cost_usd: Mapped[float | None] = mapped_column(Numeric(10, 6))
     latency_ms: Mapped[int | None] = mapped_column(Integer)
     detail: Mapped[dict | None] = mapped_column(JSONB)
+
+
+class ReportExport(Base, Timestamped):
+    """助理產生的報表檔。內容由程式查詢產生（模型不經手數字），只有建立者能下載，逾期失效。"""
+
+    __tablename__ = "report_exports"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    kind: Mapped[str] = mapped_column(String(32))
+    fmt: Mapped[str] = mapped_column(String(8))
+    filename: Mapped[str] = mapped_column(String(120))
+    row_count: Mapped[int] = mapped_column(Integer)
+    content: Mapped[bytes] = mapped_column(LargeBinary)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))

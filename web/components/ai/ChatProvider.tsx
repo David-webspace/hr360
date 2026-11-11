@@ -2,11 +2,11 @@
 
 import { createContext, use, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { shrinkImage } from "@/lib/image";
-import type { AttachmentRef, ChatReply, Citation, ConversationSummary, Draft, HistoryMessage, Me, ToolUse } from "@/lib/types";
+import type { AttachmentRef, ChatReply, Citation, ConversationSummary, Draft, ExportFile, HistoryMessage, Me, ToolUse } from "@/lib/types";
 
 export type Turn =
   | { role: "user"; text: string; images: string[] }
-  | { role: "assistant"; text: string; drafts: Draft[]; citations: Citation[]; tools: ToolUse[]; latencyMs?: number; groundingOk: boolean; suggestions?: string[] }
+  | { role: "assistant"; text: string; drafts: Draft[]; citations: Citation[]; tools: ToolUse[]; latencyMs?: number; groundingOk: boolean; suggestions?: string[]; exports: ExportFile[] }
   | { role: "error"; text: string };
 
 type ChatState = {
@@ -18,6 +18,9 @@ type ChatState = {
   busyText: string;
   conversationId: number | null;
   conversations: ConversationSummary[];
+  available: boolean;
+  floating: boolean;
+  setFloating: (value: boolean) => void;
   send: (text: string, files?: File[]) => Promise<void>;
   ask: (text: string) => void;
   newConversation: () => void;
@@ -27,6 +30,15 @@ type ChatState = {
 const ChatContext = createContext<ChatState | null>(null);
 // 只記「面板開或關」這種介面偏好；對話內容含薪資等機密，不放在瀏覽器儲存空間
 const OPEN_KEY = "hr360.ai-panel-open";
+const FLOAT_KEY = "hr360.ai-panel-floating";
+
+function remember(key: string, value: boolean) {
+  try {
+    localStorage.setItem(key, value ? "1" : "0");
+  } catch {
+    // 無痕模式或封鎖儲存空間時只是不記住偏好
+  }
+}
 const DOC_PROMPT = "請依我上傳的文件幫我請假";
 const imageUrl = (id: string) => `/api/attachments/${id}`;
 
@@ -37,6 +49,7 @@ function toTurns(messages: HistoryMessage[]): Turn[] {
       : {
           role: "assistant", text: m.text, drafts: m.meta?.drafts ?? [], citations: m.meta?.citations ?? [],
           tools: m.meta?.tools ?? [], latencyMs: m.meta?.latency_ms, groundingOk: m.meta?.grounding_ok ?? true,
+          exports: m.meta?.exports ?? [],
         },
   );
 }
@@ -60,6 +73,7 @@ async function getJson<T>(path: string): Promise<T | null> {
 export function ChatProvider({ children }: { children: ReactNode }) {
   const [me, setMe] = useState<Me | null>(null);
   const [open, setOpenState] = useState(false);
+  const [floating, setFloatingState] = useState(false);
   const [turns, setTurns] = useState<Turn[]>([]);
   const [busy, setBusy] = useState(false);
   const [busyText, setBusyText] = useState("");
@@ -67,13 +81,17 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
   const loaded = useRef(false);
 
+  // 身分載入前不顯示助理；系統管理員也有助理，但後端只給它稽核統計與匯出工具
+  const available = me !== null;
+
   const setOpen = useCallback((value: boolean) => {
     setOpenState(value);
-    try {
-      localStorage.setItem(OPEN_KEY, value ? "1" : "0");
-    } catch {
-      // 無痕模式或封鎖儲存空間時只是不記住偏好
-    }
+    remember(OPEN_KEY, value);
+  }, []);
+
+  const setFloating = useCallback((value: boolean) => {
+    setFloatingState(value);
+    remember(FLOAT_KEY, value);
   }, []);
 
   const refreshList = useCallback(async () => {
@@ -97,6 +115,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       try {
         // 只在寬螢幕自動重開（面板與內容並排）；手機上全螢幕會蓋住剛打開的頁面，等使用者自己點
         if (localStorage.getItem(OPEN_KEY) === "1" && window.innerWidth >= 1024) setOpenState(true);
+        if (localStorage.getItem(FLOAT_KEY) === "1") setFloatingState(true);
       } catch {
         // 同上
       }
@@ -107,16 +126,17 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
+      if (!available) return;
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "j") {
         e.preventDefault();
         setOpen(!open);
-      } else if (e.key === "Escape" && open && window.innerWidth < 1024) {
+      } else if (e.key === "Escape" && open && (floating || window.innerWidth < 1024)) {
         setOpen(false);
       }
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [open, setOpen]);
+  }, [available, floating, open, setOpen]);
 
   const send = useCallback(async (text: string, files: File[] = []) => {
     const message = text.trim() || (files.length ? DOC_PROMPT : "");
@@ -149,7 +169,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     setConversationId(r.conversation_id);
     setTurns((t) => [...t, {
       role: "assistant", text: r.answer, drafts: r.drafts, citations: r.citations, tools: r.meta.tools,
-      latencyMs: r.meta.latency_ms, groundingOk: r.meta.grounding_ok, suggestions: r.suggestions,
+      latencyMs: r.meta.latency_ms, groundingOk: r.meta.grounding_ok, suggestions: r.suggestions, exports: r.exports,
     }]);
     void refreshList();
   }, [busy, conversationId, refreshList]);
@@ -165,7 +185,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <ChatContext value={{ me, open, setOpen, turns, busy, busyText, conversationId, conversations, send, ask, newConversation, loadConversation }}>
+    <ChatContext value={{ me, open, setOpen, turns, busy, busyText, conversationId, conversations, available, floating, setFloating, send, ask, newConversation, loadConversation }}>
       {children}
     </ChatContext>
   );

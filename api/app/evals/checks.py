@@ -48,6 +48,12 @@ def evaluate(case: dict, r: ChatResult) -> dict:
         out["no_draft_ok"] = not r.drafts
     if "forbid_draft_types" in e:
         out["no_draft_ok"] = not any(x["leave_type"] in e["forbid_draft_types"] for x in r.drafts)
+    if "export" in e:
+        x = e["export"]
+        out["export_ok"] = any(f["kind"] == x["kind"] and f["format"] == x.get("format", f["format"]) and f["rows"] > 0
+                               for f in r.exports)
+    if e.get("no_export"):
+        out["no_export_ok"] = not r.exports
     if "citations" in e:
         sections = " ".join(c["section"] for c in r.citations)
         out["citation_ok"] = any(c in sections for c in e["citations"])

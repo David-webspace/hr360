@@ -17,8 +17,10 @@ async function forward(request: Request, ctx: RouteContext<"/api/[...path]">) {
     cache: "no-store",
   });
   const out = new Headers({ "content-type": res.headers.get("content-type") ?? "application/json" });
-  const cache = res.headers.get("cache-control");
-  if (cache) out.set("cache-control", cache);
+  for (const h of ["cache-control", "content-disposition"]) {
+    const v = res.headers.get(h);
+    if (v) out.set(h, v);
+  }
   for (const c of res.headers.getSetCookie()) out.append("set-cookie", c);
   return new Response(res.body, { status: res.status, headers: out });
 }

@@ -16,8 +16,11 @@ BY_TOOL = {
     "get_salary": ["薪資單上的勞保、健保怎麼算的？", "什麼時候發薪？"],
     "get_insurance_summary": ["勞退自提有什麼好處？", "團體保險保障哪些項目？"],
     "get_travel_subsidy": ["員工旅遊補助怎麼申請？", "我今年還剩多少特休？"],
-    "get_team_leave_summary": ["我的團隊上個月誰請最多病假？", "我今年還剩多少特休？"],
+    "get_team_leave_summary": ["把團隊這一季的請假統計匯出成 Excel", "我的團隊上個月誰請最多病假？"],
+    "export_report": ["把我今年的加班紀錄匯出成 Excel", "我今年還剩多少特休？"],
 }
+# 系統管理員只有稽核工具，建議也只給稽核類問題
+AUDIT = ["這個月誰被拒絕最多次？", "這個月哪個模型花最多錢？", "把這個月的稽核統計匯出成 Excel"]
 # 模型沒呼叫工具（例如反問澄清）時，依意圖給同一組建議
 BY_INTENT = {
     "lookup.leave_balance": BY_TOOL["get_leave_balance"],
@@ -27,6 +30,7 @@ BY_INTENT = {
     "analysis.team": BY_TOOL["get_team_leave_summary"],
     "action.leave_request": ["我今年還剩多少特休？", "請假忘記事前申請怎麼辦？"],
     "policy.qa": ["我今年還剩多少特休？", "我上個月加班費怎麼算？"],
+    "report.export": ["我今年還剩多少特休？", "把我今年的請假紀錄匯出成 Excel"],
 }
 # 被拒絕時改建議本人查得到的版本；薪資以外的拒絕多半是查別人的假勤
 ON_DENIED = {
@@ -44,7 +48,9 @@ def suggest(question: str, intent: str, tools: list[dict], drafts: list[dict], p
     if intent in SILENT_INTENTS or SILENT_TOOLS & set(names):
         return []
     denied = [t["name"] for t in tools if t["denied"]]
-    if denied:
+    if "sysadmin" in p.roles and p.emp_id is None:
+        pool = AUDIT
+    elif denied:
         pool = ON_DENIED.get(denied[0], DENIED_DEFAULT)
     elif drafts:
         pool = BY_TOOL["draft_leave_request"]

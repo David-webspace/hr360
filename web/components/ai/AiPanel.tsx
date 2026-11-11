@@ -13,8 +13,10 @@ type Pending = { file: File; url: string };
 
 const CHIP = "rounded-full border border-rule bg-sheet px-3 py-1.5 text-sm hover:border-river hover:text-river";
 
+const AUDITOR_SUGGESTIONS = ["這個月誰被拒絕最多次？", "這個月哪個模型花最多錢？", "把這個月的稽核統計匯出成 Excel"];
+
 function suggestionsFor(isManager: boolean): string[] {
-  const base = ["我今年還剩多少特休？", "我上個月加班費怎麼算？", "幫我請下週一的特休", "育嬰留停要準備什麼？"];
+  const base = ["我今年還剩多少特休？", "我上個月加班費怎麼算？", "幫我請下週一的特休", "把我今年的請假紀錄匯出成 Excel"];
   if (isManager) base.splice(2, 0, "我的團隊這一季誰請最多假？");
   return base;
 }
@@ -24,7 +26,7 @@ function Thumb({ src, alt }: { src: string; alt: string }) {
 }
 
 export function AiPanel() {
-  const { me, open, setOpen, turns, busy, busyText, send, conversations, conversationId, loadConversation, newConversation } = useChat();
+  const { me, open, setOpen, turns, busy, busyText, send, conversations, conversationId, loadConversation, newConversation, available, floating, setFloating } = useChat();
   const [input, setInput] = useState("");
   const [files, setFiles] = useState<Pending[]>([]);
   const [dragging, setDragging] = useState(false);
@@ -41,10 +43,13 @@ export function AiPanel() {
     if (open) field.current?.focus();
   }, [open]);
 
-  if (!open) return null;
+  if (!open || !available) return null;
   const name = me?.name ?? "";
+  // 系統管理員沒有員工資料：只能問稽核統計、匯出稽核報表，不需要上傳證明文件
+  const auditor = me?.roles.length === 1 && me.roles[0] === "sysadmin";
 
   function add(list: FileList | File[]) {
+    if (auditor) return;
     const images = Array.from(list).filter((f) => ACCEPT.includes(f.type));
     setNotice(images.length < Array.from(list).length ? "只接受 JPG、PNG 或 WebP 圖片" : null);
     setFiles((cur) => [...cur, ...images.map((file) => ({ file, url: URL.createObjectURL(file) }))].slice(0, MAX_FILES));
@@ -70,12 +75,14 @@ export function AiPanel() {
 
   return (
     <>
-      <div onClick={() => setOpen(false)} className="fixed inset-0 z-30 hidden bg-ink/20 md:block lg:hidden" aria-hidden="true" />
+      {!floating && <div onClick={() => setOpen(false)} className="fixed inset-0 z-30 hidden bg-ink/20 md:block lg:hidden" aria-hidden="true" />}
       <aside aria-label="HR 助理"
-        onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+        onDragOver={(e) => { e.preventDefault(); setDragging(!auditor); }}
         onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragging(false); }}
         onDrop={(e) => { e.preventDefault(); setDragging(false); add(e.dataTransfer.files); }}
-        className="fixed inset-0 z-40 flex flex-col bg-paper md:left-auto md:w-[26rem] md:border-l md:border-rule md:shadow-xl lg:sticky lg:inset-auto lg:top-0 lg:z-auto lg:h-dvh lg:shrink-0 lg:shadow-none">
+        className={`fixed inset-0 z-40 flex flex-col bg-paper ${floating
+          ? "md:inset-auto md:right-6 md:bottom-6 md:h-[min(40rem,calc(100dvh-3rem))] md:w-[24rem] md:overflow-hidden md:rounded-xl md:border md:border-rule md:shadow-2xl"
+          : "md:left-auto md:w-[26rem] md:border-l md:border-rule md:shadow-xl lg:sticky lg:inset-auto lg:top-0 lg:z-auto lg:h-dvh lg:shrink-0 lg:shadow-none"}`}>
         {dragging && (
           <div className="pointer-events-none absolute inset-2 z-10 grid place-items-center rounded-md border-2 border-dashed border-river bg-river-wash/80 text-river">
             放開以附上證明文件
@@ -83,13 +90,20 @@ export function AiPanel() {
         )}
         <header className="flex items-center gap-2 border-b border-rule bg-sheet px-4 py-3">
           <Sparkle className="size-5 text-river" />
-          <h2 className="font-display text-lg">HR 助理</h2>
+          <h2 className="shrink-0 font-display text-lg whitespace-nowrap">HR 助理</h2>
           <select aria-label="切換對話" value={conversationId ?? ""} disabled={busy}
             onChange={(e) => (e.target.value ? void loadConversation(Number(e.target.value)) : newConversation())}
             className="ml-auto max-w-36 min-w-0 truncate rounded border border-rule bg-sheet px-2 py-1 text-xs text-muted">
             <option value="">新對話</option>
             {conversations.map((c) => <option key={c.id} value={c.id}>{c.title ?? `對話 ${c.id}`}</option>)}
           </select>
+          <button onClick={() => setFloating(!floating)} aria-label={floating ? "固定在右側" : "改成浮動視窗"} title={floating ? "固定在右側" : "改成浮動視窗"}
+            className="hidden rounded px-1.5 py-1 text-muted hover:bg-paper hover:text-ink md:block">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" className="size-4" aria-hidden="true">
+              <rect x="3" y="4" width="18" height="16" rx="2" />
+              {floating ? <path d="M15 4v16" /> : <rect x="12" y="12" width="6" height="5" rx="1" />}
+            </svg>
+          </button>
           <button onClick={newConversation} disabled={busy} title="開新對話" className="rounded px-2 py-1 text-sm text-river hover:bg-river-wash disabled:opacity-50">＋</button>
           <button onClick={() => setOpen(false)} aria-label="關閉 HR 助理" title="關閉（Ctrl／⌘ + J）" className="rounded px-2 py-1 text-muted hover:bg-paper hover:text-ink">✕</button>
         </header>
@@ -97,10 +111,16 @@ export function AiPanel() {
         <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-4 py-4">
           {turns.length === 0 && (
             <div className="space-y-3">
-              <p className="text-sm text-muted">{name ? `${name}，` : ""}特休、加班費、薪資單、請假與公司規定都可以問。數字由系統依勞基法與公司規定計算；假單由你按確認後才會送出。</p>
-              <p className="text-sm text-muted">有診斷證明、訃聞或結婚證書？拍照附上，助理會讀出日期並幫你建立假單草稿。</p>
+              {auditor ? (
+                <p className="text-sm text-muted">可以問稽核統計：誰被拒絕、各模型用量與成本、異常趨勢，也能匯出成 Excel。統計不含提問原文，也看不到員工的人事資料。</p>
+              ) : (
+                <>
+                  <p className="text-sm text-muted">{name ? `${name}，` : ""}特休、加班費、薪資單、請假與公司規定都可以問。數字由系統依勞基法與公司規定計算；假單由你按確認後才會送出。</p>
+                  <p className="text-sm text-muted">有診斷證明、訃聞或結婚證書？拍照附上，助理會讀出日期並幫你建立假單草稿。也可以請助理把紀錄整理成 Excel 下載。</p>
+                </>
+              )}
               <div className="flex flex-wrap gap-2">
-                {suggestionsFor(Boolean(me?.is_manager)).map((s) => (
+                {(auditor ? AUDITOR_SUGGESTIONS : suggestionsFor(Boolean(me?.is_manager))).map((s) => (
                   <button key={s} onClick={() => void send(s)} className={CHIP}>{s}</button>
                 ))}
               </div>
@@ -151,13 +171,13 @@ export function AiPanel() {
           <div className="flex gap-2">
             <input ref={picker} type="file" accept={ACCEPT.join(",")} multiple hidden
               onChange={(e) => { if (e.target.files) add(e.target.files); e.target.value = ""; }} />
-            <button type="button" onClick={() => picker.current?.click()} disabled={busy || files.length >= MAX_FILES}
+            {!auditor && <button type="button" onClick={() => picker.current?.click()} disabled={busy || files.length >= MAX_FILES}
               aria-label="附上證明文件" title="附上證明文件（診斷證明、訃聞、結婚證書）"
               className="shrink-0 self-end rounded-md border border-rule px-2.5 py-2 text-muted hover:border-river hover:text-river disabled:opacity-40">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="size-5" aria-hidden="true">
                 <path d="M21 11.5 12.4 20a5 5 0 0 1-7.1-7.1l8.6-8.5a3.3 3.3 0 0 1 4.7 4.7l-8.6 8.5a1.7 1.7 0 0 1-2.4-2.4l7.9-7.8" />
               </svg>
-            </button>
+            </button>}
             <label htmlFor="ai-ask" className="sr-only">輸入問題</label>
             <textarea id="ai-ask" ref={field} rows={2} value={input} maxLength={2000} onChange={(e) => setInput(e.target.value)}
               onPaste={(e) => { if (e.clipboardData.files.length) { e.preventDefault(); add(e.clipboardData.files); } }}
@@ -167,7 +187,7 @@ export function AiPanel() {
                   submit();
                 }
               }}
-              placeholder={files.length ? "可補充說明，或直接送出" : "例如：幫我請下週一的特休"}
+              placeholder={files.length ? "可補充說明，或直接送出" : auditor ? "例如：這個月誰被拒絕最多次？" : "例如：幫我請下週一的特休"}
               className="min-w-0 flex-1 resize-none rounded-md border border-rule bg-paper px-3 py-2 text-sm focus:border-river focus:outline-none" />
             <button disabled={busy || (!input.trim() && !files.length)} className="shrink-0 self-end rounded-md bg-river px-4 py-2 text-sm text-white hover:bg-river-deep disabled:opacity-40">送出</button>
           </div>

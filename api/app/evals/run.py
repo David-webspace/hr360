@@ -30,7 +30,7 @@ from app.models import EvalRun
 
 ROOT = Path(__file__).resolve().parents[2] / "eval"
 MIN_CASES = 3
-CHECK_KEYS = ("tool_ok", "numeric_ok", "refuse_ok", "draft_ok", "no_draft_ok", "citation_ok", "semantic_ok")
+CHECK_KEYS = ("tool_ok", "numeric_ok", "refuse_ok", "draft_ok", "no_draft_ok", "export_ok", "no_export_ok", "citation_ok", "semantic_ok")
 
 
 def load_cases(only: set[str] | None = None) -> list[dict]:

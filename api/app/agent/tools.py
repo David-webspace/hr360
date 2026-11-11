@@ -14,8 +14,8 @@ from sqlalchemy.orm import Session
 from app.agent.llm import ToolSpec
 from app.auth import Principal
 from app.kb.search import search
-from app.policy import DENIED, PolicyDenied
-from app.services import hr, leave, tickets
+from app.policy import DENIED, AmbiguousEmployee, PolicyDenied
+from app.services import hr, leave, reports, tickets
 
 log = logging.getLogger(__name__)
 RAG_MIN_SCORE = 0.45
@@ -116,23 +116,61 @@ TOOLS: dict[str, Tool] = {t.spec.name: t for t in [
                         "summary": {"type": "string", "description": "給人資看的問題摘要"}}, ["category", "summary"])),
          lambda c, a: tickets.create(c.db, c.principal, a["category"], a["summary"], c.conversation_id),
          action=True),
+    Tool(ToolSpec("export_report",
+                  "把資料整理成可下載的 Excel（xlsx）或 CSV 檔，表格內容由系統查詢產生。報表種類：my_leave 我的請假紀錄、"
+                  "my_overtime 我的加班紀錄、team_leave 團隊請假統計（主管／HRBP）、audit_by_user 稽核統計依使用者、"
+                  "audit_by_model 稽核統計依模型（系統管理員）。使用者沒指定格式時用 xlsx。",
+                  _obj({"kind": {"type": "string", "enum": list(reports.REPORTS)},
+                        "format": {"type": "string", "enum": list(reports.FORMATS)},
+                        "start": {"type": "string", "description": "YYYY-MM-DD"},
+                        "end": {"type": "string", "description": "YYYY-MM-DD"}}, ["kind", "format", "start", "end"])),
+         lambda c, a: reports.export(c.db, c.principal, a["kind"], a["format"], a["start"], a["end"]),
+         action=True),
+    Tool(ToolSpec("get_audit_stats",
+                  "系統管理員查詢稽核統計：指定期間依使用者、模型、意圖或拒絕原因，彙總提問數、拒絕數、數字未核對次數、"
+                  "tokens、成本與平均延遲。不含提問原文。",
+                  _obj({"start": {"type": "string", "description": "YYYY-MM-DD"},
+                        "end": {"type": "string", "description": "YYYY-MM-DD"},
+                        "group_by": {"type": "string", "enum": list(reports.GROUP_BY)}}, ["start", "end", "group_by"])),
+         lambda c, a: _audit_stats(c, a)),
 ]}
 
+# 每個角色拿到的工具不同：只有系統管理員身分的帳號沒有員工資料，只給稽核統計與匯出；
+# 其他人拿不到稽核工具。工具清單由登入身分決定，不靠提示詞叮嚀模型「不要用」。
+AUDIT_TOOLS = {"get_audit_stats", "export_report"}
 
-def specs() -> list[ToolSpec]:
-    return [t.spec for t in TOOLS.values()]
+
+def tool_names(p: Principal) -> list[str]:
+    if reports.is_sysadmin(p) and p.emp_id is None:
+        return [n for n in TOOLS if n in AUDIT_TOOLS]
+    return [n for n in TOOLS if n != "get_audit_stats"]
+
+
+def specs(p: Principal) -> list[ToolSpec]:
+    return [TOOLS[n].spec for n in tool_names(p)]
+
+
+def _audit_stats(c: ToolContext, a: dict) -> dict:
+    start, end = reports.period(a["start"], a["end"])
+    columns, rows = reports.audit_stats(c.db, c.principal, start, end, a["group_by"])
+    return {"period": f"{start}～{end}", "group_by": reports.GROUP_BY[a["group_by"]], "columns": columns,
+            "rows": rows[:30], "groups": len(rows), "basis": "問答與 MCP 呼叫的彙總，不含提問原文"}
 
 
 def run_tool(ctx: ToolContext, name: str, args: dict) -> ToolOutcome:
-    tool = TOOLS.get(name)
+    tool = TOOLS.get(name) if name in tool_names(ctx.principal) else None
     if tool is None:
         return ToolOutcome(name, args, {"error": f"沒有 {name} 這個工具"}, error=True)
     try:
         return ToolOutcome(name, args, tool.run(ctx, args))
+    except AmbiguousEmployee as e:
+        ctx.db.rollback()
+        return ToolOutcome(name, args, {"error": f"有 {len(e.candidates)} 位同名員工，請使用者改用員工編號指定",
+                                        "candidates": e.candidates}, error=True)
     except PolicyDenied as e:
         ctx.db.rollback()
         return ToolOutcome(name, args, {"error": DENIED}, denied=True, deny_reason=e.reason)
-    except leave.LeaveError as e:
+    except (leave.LeaveError, reports.ReportError) as e:
         ctx.db.rollback()
         return ToolOutcome(name, args, {"error": str(e)}, error=True)
     except (KeyError, ValueError) as e:

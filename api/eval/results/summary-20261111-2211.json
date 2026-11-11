@@ -1,0 +1,204 @@
+{
+  "claude-haiku-5-5": {
+    "_all": {
+      "n": 88,
+      "cases": 44,
+      "pass_rate": 1.0,
+      "numeric_acc": 1.0,
+      "semantic_acc": 1.0,
+      "refusal_n": 16,
+      "leak_rate": 0.0,
+      "avg_latency_ms": 4780,
+      "avg_cost_usd": 0.000494
+    },
+    "lookup.leave_balance": {
+      "n": 16,
+      "cases": 8,
+      "pass_rate": 1.0,
+      "numeric_acc": 1.0,
+      "semantic_acc": 1.0,
+      "refusal_n": 4,
+      "leak_rate": 0.0,
+      "avg_latency_ms": 4887,
+      "avg_cost_usd": 0.000446
+    },
+    "lookup.overtime_pay": {
+      "n": 6,
+      "cases": 3,
+      "pass_rate": 1.0,
+      "numeric_acc": 1.0,
+      "semantic_acc": 1.0,
+      "refusal_n": 0,
+      "leak_rate": null,
+      "avg_latency_ms": 4228,
+      "avg_cost_usd": 0.000532
+    },
+    "analysis.team": {
+      "n": 4,
+      "cases": 2,
+      "pass_rate": 1.0,
+      "numeric_acc": 1.0,
+      "semantic_acc": 1.0,
+      "refusal_n": 2,
+      "leak_rate": 0.0,
+      "avg_latency_ms": 3601,
+      "avg_cost_usd": 0.000394
+    },
+    "lookup.payroll": {
+      "n": 18,
+      "cases": 9,
+      "pass_rate": 1.0,
+      "numeric_acc": 1.0,
+      "semantic_acc": 1.0,
+      "refusal_n": 10,
+      "leak_rate": 0.0,
+      "avg_latency_ms": 4776,
+      "avg_cost_usd": 0.000389
+    },
+    "lookup.benefits": {
+      "n": 2,
+      "cases": 1,
+      "pass_rate": 1.0,
+      "numeric_acc": 1.0,
+      "semantic_acc": 1.0,
+      "refusal_n": 0,
+      "leak_rate": null,
+      "avg_latency_ms": 2471,
+      "avg_cost_usd": 0.000276
+    },
+    "action.leave_request": {
+      "n": 24,
+      "cases": 12,
+      "pass_rate": 1.0,
+      "numeric_acc": 1.0,
+      "semantic_acc": 1.0,
+      "refusal_n": 0,
+      "leak_rate": null,
+      "avg_latency_ms": 5694,
+      "avg_cost_usd": 0.000643
+    },
+    "policy.qa": {
+      "n": 14,
+      "cases": 7,
+      "pass_rate": 1.0,
+      "numeric_acc": 1.0,
+      "semantic_acc": 1.0,
+      "refusal_n": 0,
+      "leak_rate": null,
+      "avg_latency_ms": 3866,
+      "avg_cost_usd": 0.000433
+    },
+    "escalate": {
+      "n": 4,
+      "cases": 2,
+      "pass_rate": 1.0,
+      "numeric_acc": null,
+      "semantic_acc": 1.0,
+      "refusal_n": 0,
+      "leak_rate": null,
+      "avg_latency_ms": 5255,
+      "avg_cost_usd": 0.00064
+    }
+  },
+  "claude-sonnet-5-5": {
+    "_all": {
+      "n": 88,
+      "cases": 44,
+      "pass_rate": 0.989,
+      "numeric_acc": 1.0,
+      "semantic_acc": 0.981,
+      "refusal_n": 16,
+      "leak_rate": 0.0,
+      "avg_latency_ms": 5341,
+      "avg_cost_usd": 0.007797
+    },
+    "lookup.leave_balance": {
+      "n": 16,
+      "cases": 8,
+      "pass_rate": 0.938,
+      "numeric_acc": 1.0,
+      "semantic_acc": 0.9,
+      "refusal_n": 4,
+      "leak_rate": 0.0,
+      "avg_latency_ms": 4825,
+      "avg_cost_usd": 0.007807
+    },
+    "lookup.overtime_pay": {
+      "n": 6,
+      "cases": 3,
+      "pass_rate": 1.0,
+      "numeric_acc": 1.0,
+      "semantic_acc": 1.0,
+      "refusal_n": 0,
+      "leak_rate": null,
+      "avg_latency_ms": 4723,
+      "avg_cost_usd": 0.008237
+    },
+    "analysis.team": {
+      "n": 4,
+      "cases": 2,
+      "pass_rate": 1.0,
+      "numeric_acc": 1.0,
+      "semantic_acc": 1.0,
+      "refusal_n": 2,
+      "leak_rate": 0.0,
+      "avg_latency_ms": 4124,
+      "avg_cost_usd": 0.007046
+    },
+    "lookup.payroll": {
+      "n": 18,
+      "cases": 9,
+      "pass_rate": 1.0,
+      "numeric_acc": 1.0,
+      "semantic_acc": 1.0,
+      "refusal_n": 10,
+      "leak_rate": 0.0,
+      "avg_latency_ms": 4827,
+      "avg_cost_usd": 0.005713
+    },
+    "lookup.benefits": {
+      "n": 2,
+      "cases": 1,
+      "pass_rate": 1.0,
+      "numeric_acc": 1.0,
+      "semantic_acc": 1.0,
+      "refusal_n": 0,
+      "leak_rate": null,
+      "avg_latency_ms": 4016,
+      "avg_cost_usd": 0.005406
+    },
+    "action.leave_request": {
+      "n": 24,
+      "cases": 12,
+      "pass_rate": 1.0,
+      "numeric_acc": 1.0,
+      "semantic_acc": 1.0,
+      "refusal_n": 0,
+      "leak_rate": null,
+      "avg_latency_ms": 6709,
+      "avg_cost_usd": 0.009372
+    },
+    "policy.qa": {
+      "n": 14,
+      "cases": 7,
+      "pass_rate": 1.0,
+      "numeric_acc": 1.0,
+      "semantic_acc": 1.0,
+      "refusal_n": 0,
+      "leak_rate": null,
+      "avg_latency_ms": 4921,
+      "avg_cost_usd": 0.007585
+    },
+    "escalate": {
+      "n": 4,
+      "cases": 2,
+      "pass_rate": 1.0,
+      "numeric_acc": null,
+      "semantic_acc": 1.0,
+      "refusal_n": 0,
+      "leak_rate": null,
+      "avg_latency_ms": 5791,
+      "avg_cost_usd": 0.009717
+    }
+  }
+}

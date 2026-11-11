@@ -25,6 +25,14 @@ class PolicyDenied(Exception):
         self.reason = reason
 
 
+class AmbiguousEmployee(PolicyDenied):
+    """權限範圍內有多位同名員工。候選人只取自可見範圍，告訴使用者不會洩漏範圍外的人。"""
+
+    def __init__(self, candidates: list[dict]) -> None:
+        super().__init__("ambiguous")
+        self.candidates = candidates
+
+
 LEVEL_RANK = {"S0": 0, "S1": 1, "S2": 2, "S3": 3}
 
 
@@ -55,7 +63,8 @@ def scope_sql(p: Principal, level: str, alias: str = "e") -> tuple[str, dict]:
 
 def resolve_employee(db: Session, p: Principal, who: str | None, level: str) -> dict:
     """把「誰」（姓名、員工編號，或省略＝本人）解析成員工，同時套用權限範圍。"""
-    if not who or who in ("me", "self", "本人", "我", p.name):
+    # 不把「自己的名字」當成查本人：主管和部屬同名時，會查錯人
+    if not who or who.strip() in ("me", "self", "本人", "我"):
         if p.emp_id is None:
             raise PolicyDenied("no_employee_record")
         who_cond, params = "e.id = :target", {"target": p.emp_id}
@@ -68,6 +77,9 @@ def resolve_employee(db: Session, p: Principal, who: str | None, level: str) -> 
         FROM employees e JOIN org_units o ON o.id = e.org_unit_id
         WHERE {who_cond} AND {scope}
     """), {**params, **sp}).mappings().all()
-    if len(rows) != 1:
-        raise PolicyDenied("out_of_scope_or_not_found" if not rows else "ambiguous")
+    if not rows:
+        raise PolicyDenied("out_of_scope_or_not_found")
+    if len(rows) > 1:
+        raise AmbiguousEmployee([{"emp_no": r["emp_no"], "name": r["name"], "unit": r["unit_name"], "title": r["title"]}
+                                 for r in rows])
     return dict(rows[0])

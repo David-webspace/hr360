@@ -72,7 +72,7 @@ docker compose exec api python -m app.agent.check
 docker compose exec api python -m app.evals.run --models fast,strong --repeats 2 --write-router
 ```
 
-用目前設定的模型跑完 43 題評測（每題 2 次），產生：
+用目前設定的模型跑完 49 題評測（每題 2 次），產生：
 
 - `api/eval/REPORT.md`：通過率、數字正確率、口徑正確率、越權洩漏率、延遲、成本，以及未通過的題目與原因
 - `api/config/router_table.yaml`：依結果決定每類問題用 fast 還是 strong

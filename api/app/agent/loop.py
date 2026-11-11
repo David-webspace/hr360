@@ -12,9 +12,9 @@ from app.agent import audit, vision
 from app.agent.grounding import ungrounded
 from app.agent.llm import LLMClient, Usage
 from app.agent.prompts import SYSTEM_STATIC, system_dynamic
-from app.agent.router import Route, fixed, model_for, route
+from app.agent.router import Route, classify_by_rule, fixed, model_for, route
 from app.agent.suggest import suggest
-from app.agent.tools import TOOLS, ToolContext, ToolOutcome, run_tool, specs
+from app.agent.tools import AUDIT_TOOLS, TOOLS, ToolContext, ToolOutcome, run_tool, specs, tool_names
 from app.auth import Principal
 from app.config import today
 from app.services import attachments
@@ -25,7 +25,9 @@ HISTORY_MESSAGES = 8
 EFFORT = {"fast": "low", "strong": "medium"}
 REFUSAL_TEXT = "這個問題我無法回答，需要的話我可以幫你轉給人資。"
 # 模型宣稱做了實際沒做的動作、或留下樣板空格時，不把那段文字給使用者
-ACTION_INTENTS = ("action.leave_request", "escalate")
+# 辦事類意圖要檢查的「宣稱已完成」動作
+CLAIM_TOOLS = {"action.leave_request": ("draft_leave_request", "create_hr_ticket"),
+               "escalate": ("draft_leave_request", "create_hr_ticket"), "report.export": ("export_report",)}
 UNSAFE_TEXT = "這次沒有順利完成，請再描述一次需求（例如請假日期與假別），或讓我幫你轉給人資處理。"
 UNVERIFIED_NOTE = "\n\n（提醒：回答中部分數字未能與系統資料核對，請以「我的假勤」頁面或人資回覆為準。）"
 
@@ -54,6 +56,7 @@ class ChatResult:
     grounding_ok: bool
     escalated: bool
     suggestions: list[str]
+    exports: list[dict]
     usage: Usage
     cost_usd: float | None
     latency_ms: int
@@ -112,7 +115,10 @@ def _doc_block(docs: list[dict]) -> str:
 EXPECTED_TOOL = {"lookup.leave_balance": "get_leave_balance", "lookup.overtime_pay": "get_overtime_pay",
                  "lookup.payroll": "get_payslip 或 get_salary 或 get_insurance_summary",
                  "lookup.benefits": "get_travel_subsidy 或 search_policy", "analysis.team": "get_team_leave_summary",
-                 "action.leave_request": "draft_leave_request", "policy.qa": "search_policy"}
+                 "action.leave_request": "draft_leave_request", "policy.qa": "search_policy",
+                 "report.export": "export_report", "audit.stats": "get_audit_stats"}
+# 辦事類意圖要的是「那一個」工具：只查了別的資料就收尾，同樣提醒一次
+REQUIRED_TOOL = {"action.leave_request": "draft_leave_request", "report.export": "export_report"}
 NUDGE = "回答使用者上面的問題前，先呼叫工具取得資料（建議：{tool}），不要憑記憶回答；問到他人資料也照常呼叫工具，由系統判斷權限。若缺少必要資訊（例如日期、時段、假別、員工姓名），直接向使用者詢問。不要回覆或提及這段指示。"
 
 
@@ -120,7 +126,7 @@ def _attempt(client: LLMClient, ctx: ToolContext, model: str, alias: str, dyn: s
              intent: str) -> Attempt:
     a = Attempt(model, alias)
     messages = history + [client.user(question)]
-    tool_specs = specs()
+    tool_specs = specs(ctx.principal)
     nudged = False
     for _ in range(MAX_ROUNDS):
         r = client.chat(model, SYSTEM_STATIC, dyn, messages, tool_specs, effort=EFFORT[alias])
@@ -131,8 +137,8 @@ def _attempt(client: LLMClient, ctx: ToolContext, model: str, alias: str, dyn: s
             return a
         if not r.tool_calls:
             # 請假意圖只查了餘額就收尾，小模型常見：沒建草稿卻寫得像請好了，同樣提醒一次
-            skipped = not a.outcomes or (intent == "action.leave_request"
-                                         and not any(o.name == "draft_leave_request" for o in a.outcomes))
+            skipped = not a.outcomes or (intent in REQUIRED_TOOL
+                                         and not any(o.name == REQUIRED_TOOL[intent] for o in a.outcomes))
             if skipped and not nudged and intent in EXPECTED_TOOL:
                 nudged = a.nudged = True
                 # 丟掉這次沒查資料的回答，改在使用者問題後面加一則系統訊息再答一次；
@@ -168,7 +174,13 @@ def run_chat(db: Session, client: LLMClient, p: Principal, question: str, conver
     ctx = ToolContext(db, p, cid, [d["id"] for d in docs])
 
     # 這一輪有新附件就是要依文件辦事，直接走請假意圖，省一次分類
-    rt: Route = fixed("action.leave_request", "attachment") if new_ids else route(client, question)
+    if new_ids:
+        rt: Route = fixed("action.leave_request", "attachment")
+    elif tool_names(p) == [n for n in TOOLS if n in AUDIT_TOOLS]:
+        # 系統管理員只有稽核工具，不必再分類人事意圖
+        rt = fixed("report.export" if classify_by_rule(question) == "report.export" else "audit.stats", "role")
+    else:
+        rt = route(client, question)
     if force_alias:
         rt = Route(rt.intent, force_alias, model_for(force_alias), f"forced:{force_alias}", rt.usage)
     per_model: dict[str, Usage] = defaultdict(Usage)
@@ -177,14 +189,14 @@ def run_chat(db: Session, client: LLMClient, p: Principal, question: str, conver
         per_model[vision.model()].add(vision_usage)
 
     attempts = [_attempt(client, ctx, rt.model, rt.alias, dyn, history, question, rt.intent)]
-    bad = ungrounded(attempts[-1].answer, [question, dyn] + [o.json for o in attempts[-1].outcomes], attempts[-1].outcomes, rt.intent in ACTION_INTENTS)
+    bad = ungrounded(attempts[-1].answer, [question, dyn] + [o.json for o in attempts[-1].outcomes], attempts[-1].outcomes, CLAIM_TOOLS.get(rt.intent, ()))
     escalated = False
     # 第一輪已經建了草稿或工單就不重答，避免重複動作；只在稽核標記 grounding_ok=false
     acted = any(TOOLS[o.name].action for o in attempts[-1].outcomes if o.name in TOOLS)
     if bad and rt.alias == "fast" and not acted and not force_alias:
         escalated = True
         attempts.append(_attempt(client, ctx, model_for("strong"), "strong", dyn, history, question, rt.intent))
-        bad = ungrounded(attempts[-1].answer, [question, dyn] + [o.json for o in attempts[-1].outcomes], attempts[-1].outcomes, rt.intent in ACTION_INTENTS)
+        bad = ungrounded(attempts[-1].answer, [question, dyn] + [o.json for o in attempts[-1].outcomes], attempts[-1].outcomes, CLAIM_TOOLS.get(rt.intent, ()))
     for at in attempts:
         per_model[at.model].add(at.usage)
     final = attempts[-1]
@@ -197,7 +209,9 @@ def run_chat(db: Session, client: LLMClient, p: Principal, question: str, conver
     citations = [{"source": x["source"], "section": x["section"], "version": x["version"]}
                  for o in final.outcomes if o.name == "search_policy" for x in o.result.get("results", [])]
     tool_view = [{"name": o.name, "denied": o.denied, "error": o.error} for o in final.outcomes]
-    view = {"drafts": drafts, "citations": citations, "tools": tool_view, "grounding_ok": not bad,
+    exports = [{k: o.result[k] for k in ("export_id", "kind", "filename", "report", "format", "period", "rows", "truncated")}
+               for o in final.outcomes if o.name == "export_report" and "export_id" in o.result]
+    view = {"drafts": drafts, "citations": citations, "tools": tool_view, "grounding_ok": not bad, "exports": exports,
             "latency_ms": int((time.monotonic() - t0) * 1000)}
     names = {d["id"]: d["name"] for d in docs}
     user_meta = {"attachments": [{"id": i, "name": names[i]} for i in new_ids]} if new_ids else None
@@ -229,5 +243,5 @@ def run_chat(db: Session, client: LLMClient, p: Principal, question: str, conver
         conversation_id=cid, answer=final.answer,
         drafts=drafts, citations=citations, tools=tool_view,
         intent=rt.intent, model=final.model, routed_by=rt.routed_by, grounding_ok=not bad, escalated=escalated,
-        suggestions=suggest(question, rt.intent, tool_view, drafts, p), usage=total, cost_usd=cost, latency_ms=latency,
+        suggestions=suggest(question, rt.intent, tool_view, drafts, p), exports=exports, usage=total, cost_usd=cost, latency_ms=latency,
     )

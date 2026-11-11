@@ -12,10 +12,11 @@ from app.agent.prompts import ROUTER_PROMPT
 from app.config import settings
 
 INTENTS = ("lookup.leave_balance", "lookup.overtime_pay", "lookup.payroll", "lookup.benefits", "analysis.team",
-           "action.leave_request", "policy.qa", "escalate", "other")
+           "action.leave_request", "report.export", "policy.qa", "escalate", "audit.stats", "other")
 
 RULES = [
     ("escalate", r"申訴|性騷擾|騷擾|算錯|不合理|要找人資|轉人工"),
+    ("report.export", r"(?i)匯出|下載|excel|xlsx|csv|整理成.{0,4}(表|檔)"),
     ("analysis.team", r"團隊|部屬|組員|我們(課|部|組)|下屬|誰請(最多|最久)|出勤狀況"),
     ("action.leave_request", r"幫我請|我要請|我想請|請.{0,6}(明天|後天|下週|下周|\d+\s*[/月])|取消.{0,4}假"),
     ("lookup.overtime_pay", r"加班費"),

@@ -1,6 +1,7 @@
 import logging
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
+from urllib.parse import quote
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response
 from fastapi.responses import JSONResponse
@@ -20,7 +21,7 @@ from app.ratelimit import SlidingWindow
 from app import tokens
 from app.mcp_server import http_app as mcp_http_app
 from app.mcp_server import mcp
-from app.services import attachments, hr, leave, tickets
+from app.services import attachments, hr, leave, reports, tickets
 
 log = logging.getLogger("hr360")
 
@@ -123,7 +124,7 @@ def chat(body: ChatIn, p: Principal = Depends(current_principal), db: Session = 
         log.exception("chat failed")
         raise HTTPException(503, "HR 助理暫時無法回應，請稍後再試")
     return {"conversation_id": r.conversation_id, "answer": r.answer, "drafts": r.drafts, "citations": r.citations,
-            "suggestions": r.suggestions, "meta": {"intent": r.intent, "model": r.model, "routed_by": r.routed_by, "grounding_ok": r.grounding_ok,
+            "suggestions": r.suggestions, "exports": r.exports, "meta": {"intent": r.intent, "model": r.model, "routed_by": r.routed_by, "grounding_ok": r.grounding_ok,
                      "escalated": r.escalated, "tools": r.tools, "latency_ms": r.latency_ms, "cost_usd": r.cost_usd,
                      "tokens": vars(r.usage)}}
 
@@ -145,6 +146,16 @@ def get_attachment(aid: str, p: Principal = Depends(current_principal), db: Sess
     # no-store：快取的原圖會在同一台電腦換人登入後直接從瀏覽器取出，繞過權限檢查
     return Response(attachments.image_bytes(attachments.viewable(db, p, aid)), media_type="image/jpeg",
                     headers={"cache-control": "no-store"})
+
+
+@app.get("/api/exports/{eid}")
+def get_export(eid: str, p: Principal = Depends(current_principal), db: Session = Depends(get_db)) -> Response:
+    name, media_type, content = reports.download(db, p, eid)
+    audit.write(db, p, "report_download", question=name)
+    # filename*：中文檔名用 RFC 5987 編碼；no-store 同附件，換人登入後不能從瀏覽器快取取出
+    return Response(content, media_type=media_type, headers={
+        "content-disposition": f"attachment; filename=\"export.{name.rsplit('.', 1)[-1]}\"; filename*=UTF-8''{quote(name)}",
+        "cache-control": "no-store"})
 
 
 @app.get("/api/conversations")
@@ -235,7 +246,7 @@ def ticket_list(p: Principal = Depends(current_principal), db: Session = Depends
 def audit_log(event: str | None = Query(None, max_length=40), user: str | None = Query(None, max_length=40),
               intent: str | None = Query(None, max_length=40), flagged: bool = False,
               _: Principal = Depends(require_role("sysadmin")), db: Session = Depends(get_db)) -> dict:
-    # 篩選條件全部走參數綁定；帳號欄同時比對帳號與姓名，方便用中文名字找人
+    # 篩選條件全部走參數綁定；帳號欄同時比對帳號、姓名與員工編號（同名時用員工編號區分）
     where, params = [], {}
     if event:
         where.append("a.event = :event")
@@ -244,12 +255,12 @@ def audit_log(event: str | None = Query(None, max_length=40), user: str | None =
         where.append("a.intent = :intent")
         params["intent"] = intent
     if user:
-        where.append("(u.username ILIKE :user OR e.name ILIKE :user)")
+        where.append("(u.username ILIKE :user OR e.name ILIKE :user OR e.emp_no ILIKE :user)")
         params["user"] = f"%{user.strip()}%"
     if flagged:
         where.append("(a.denied OR a.grounding_ok = false)")
     rows = db.execute(text(f"""
-        SELECT a.ts, u.username, e.name, a.roles, a.channel, a.event, a.question, a.intent, a.model, a.routed_by, a.tools,
+        SELECT a.ts, u.username, e.name, e.emp_no, a.roles, a.channel, a.event, a.question, a.intent, a.model, a.routed_by, a.tools,
                a.denied, a.deny_reason, a.input_tokens, a.output_tokens, a.cache_read_tokens, a.cache_write_tokens,
                a.cost_usd, a.latency_ms, a.grounding_ok
         FROM audit_log a LEFT JOIN users u ON u.id = a.user_id LEFT JOIN employees e ON e.id = u.employee_id

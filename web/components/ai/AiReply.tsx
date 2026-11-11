@@ -6,6 +6,7 @@ const TOOL_LABEL: Record<string, string> = {
   get_leave_balance: "假勤帳本", get_overtime_pay: "加班費計算", get_team_leave_summary: "團隊出勤",
   get_salary: "薪資", get_payslip: "薪資單", get_insurance_summary: "勞健保", get_travel_subsidy: "旅遊補助",
   draft_leave_request: "建立假單草稿", search_policy: "規章檢索", create_hr_ticket: "開立工單", find_employee: "通訊錄",
+  export_report: "匯出報表", get_audit_stats: "稽核統計",
 };
 
 export function AiReply({ t, name }: { t: Extract<Turn, { role: "assistant" }>; name: string }) {
@@ -17,6 +18,17 @@ export function AiReply({ t, name }: { t: Extract<Turn, { role: "assistant" }>; 
           start={d.start} end={d.end} hoursValue={d.hours} approver={d.approver} warnings={d.warnings} initialStatus={d.status}
           documents={d.attachments}
           balance={d.balance_before !== undefined && d.balance_after !== undefined ? { before: d.balance_before, after: d.balance_after } : undefined} />
+      ))}
+      {t.exports.map((x) => (
+        <a key={x.export_id} href={`/api/exports/${x.export_id}`} download={x.filename}
+          className="flex min-w-0 items-center gap-3 rounded-md border border-rule bg-sheet px-3 py-2.5 hover:border-river">
+          <span className="grid size-9 shrink-0 place-items-center rounded bg-river-wash text-xs font-medium text-river uppercase">{x.format}</span>
+          <span className="min-w-0 flex-1">
+            <span className="block truncate font-medium">{x.filename}</span>
+            <span className="block text-xs text-muted">{x.period}・<span className="num">{x.rows}</span> 列{x.truncated && "（已達上限，只匯出前段）"}・24 小時內有效</span>
+          </span>
+          <span className="shrink-0 text-sm text-river">下載</span>
+        </a>
       ))}
       {t.citations.length > 0 && (
         <ul className="flex flex-wrap gap-1.5 text-xs">

@@ -5,7 +5,7 @@ import { DENY_LABEL, EVENT_LABEL, INTENT_LABEL, label, routeLabel } from "@/lib/
 
 type Summary = { model: string; n: number; avg_input: number; avg_output: number; avg_latency_ms: number; cost_usd: string | null; denied: number; ungrounded: number };
 type Event = {
-  ts: string; username: string | null; name: string | null; event: string; question: string | null; intent: string | null; model: string | null;
+  ts: string; username: string | null; name: string | null; emp_no: string | null; event: string; question: string | null; intent: string | null; model: string | null;
   routed_by: string | null; denied: boolean; deny_reason: string | null; input_tokens: number; output_tokens: number;
   cache_read_tokens: number; latency_ms: number | null; cost_usd: string | null; grounding_ok: boolean | null;
 };
@@ -26,7 +26,7 @@ async function Audit({ searchParams }: { searchParams: Params }) {
         <div className="overflow-x-auto rounded-md border border-rule bg-sheet">
           <table className="w-full min-w-[40rem] text-sm">
             <thead className="bg-paper text-left text-muted">
-              <tr>{["模型", "問答數", "平均輸入", "平均輸出", "平均延遲", "總成本 USD", "拒絕", "數字未核對"].map((h) => <th key={h} className="px-3 py-2 font-normal">{h}</th>)}</tr>
+              <tr>{["模型", "問答數", "平均輸入", "平均輸出", "平均延遲", "總成本 USD", "拒絕", "數字未核對"].map((h) => <th key={h} className="px-3 py-2 font-normal whitespace-nowrap">{h}</th>)}</tr>
             </thead>
             <tbody className="num divide-y divide-rule">
               {summary.map((s) => (
@@ -56,7 +56,7 @@ async function Audit({ searchParams }: { searchParams: Params }) {
             <option value="">全部意圖</option>
             {Object.entries(INTENT_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
           </select>
-          <input name="user" defaultValue={f.user} placeholder="帳號或姓名" aria-label="帳號或姓名" maxLength={40} className={`${FIELD} w-36 min-w-0`} />
+          <input name="user" defaultValue={f.user} placeholder="帳號、姓名或員工編號" aria-label="帳號、姓名或員工編號" maxLength={40} className={`${FIELD} w-44 min-w-0`} />
           <label className="flex items-center gap-1.5 text-sm text-muted">
             <input type="checkbox" name="flagged" value="true" defaultChecked={f.flagged === "true"} />只看拒絕與數字未核對
           </label>
@@ -65,24 +65,31 @@ async function Audit({ searchParams }: { searchParams: Params }) {
           <span className="ml-auto text-xs text-muted">{events.length === 200 ? "顯示最新 200 筆" : `共 ${events.length} 筆`}</span>
         </form>
         <div className="overflow-x-auto rounded-md border border-rule bg-sheet">
-          <table className="w-full min-w-[56rem] text-sm">
+          <table className="w-full min-w-[66rem] text-sm">
             <thead className="bg-paper text-left text-muted">
-              <tr>{["時間", "使用者", "事件", "問題", "意圖／模型", "tokens 入/快取/出", "延遲", "結果"].map((h) => <th key={h} className="px-3 py-2 font-normal">{h}</th>)}</tr>
+              <tr>{["時間", "使用者", "事件", "問題", "意圖／模型", "tokens 入/快取/出", "延遲", "結果"].map((h) => <th key={h} className="px-3 py-2 font-normal whitespace-nowrap">{h}</th>)}</tr>
             </thead>
             <tbody className="divide-y divide-rule">
               {events.map((e, i) => (
                 <tr key={i} className={e.denied ? "bg-seal/5" : undefined}>
                   <td className="num px-3 py-2 whitespace-nowrap text-muted">{new Date(e.ts).toLocaleString("zh-TW", { timeZone: "Asia/Taipei", hour12: false })}</td>
-                  <td className="px-3 py-2">{e.name ?? e.username ?? "—"}{e.name && <span className="block text-xs text-muted">{e.username}</span>}</td>
+                  <td className="px-3 py-2">{e.name ?? e.username ?? "—"}{e.name && <span className="block text-xs text-muted">{e.username}・{e.emp_no}</span>}</td>
                   <td className="px-3 py-2 whitespace-nowrap" title={e.event}>{label(EVENT_LABEL, e.event)}</td>
                   <td className="max-w-64 truncate px-3 py-2" title={e.question ?? ""}>{e.question ?? ""}</td>
-                  <td className="px-3 py-2 text-xs" title={[e.intent, e.routed_by].filter(Boolean).join(" ")}>
+                  <td className="min-w-44 px-3 py-2 text-xs" title={[e.intent, e.routed_by].filter(Boolean).join(" ")}>
                     {label(INTENT_LABEL, e.intent)}
-                    {e.model && <span className="block text-muted">{e.model}・{routeLabel(e.routed_by)}</span>}
+                    {e.model && (
+                      <span className="block text-muted">
+                        {/* 每段不拆字，只在「・」之間換行，避免剩一兩個字掉到下一行 */}
+                        {[e.model, ...routeLabel(e.routed_by).split("・").filter(Boolean)].map((x, j) => (
+                          <span key={j} className="whitespace-nowrap">{j > 0 && "・"}{x}</span>
+                        ))}
+                      </span>
+                    )}
                   </td>
-                  <td className="num px-3 py-2 text-xs">{e.input_tokens}/{e.cache_read_tokens}/{e.output_tokens}</td>
-                  <td className="num px-3 py-2 text-xs">{e.latency_ms ? `${(e.latency_ms / 1000).toFixed(1)}s` : ""}</td>
-                  <td className="px-3 py-2 text-xs">
+                  <td className="num px-3 py-2 text-xs whitespace-nowrap">{e.input_tokens}/{e.cache_read_tokens}/{e.output_tokens}</td>
+                  <td className="num px-3 py-2 text-xs whitespace-nowrap">{e.latency_ms ? `${(e.latency_ms / 1000).toFixed(1)}s` : ""}</td>
+                  <td className="px-3 py-2 text-xs whitespace-nowrap">
                     {e.denied && <span className="text-seal" title={e.deny_reason ?? ""}>拒絕：{label(DENY_LABEL, e.deny_reason)}</span>}
                     {e.grounding_ok === false && <span className="text-seal">數字未核對</span>}
                   </td>

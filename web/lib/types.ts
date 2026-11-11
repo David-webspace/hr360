@@ -29,6 +29,7 @@ export type Draft = {
 };
 
 export type Citation = { source: string; section: string; version: string };
+export type ExportFile = { export_id: string; filename: string; report: string; format: string; period: string; rows: number; truncated: boolean };
 
 export type ToolUse = { name: string; denied: boolean; error: boolean };
 
@@ -43,6 +44,7 @@ export type HistoryMessage = {
     grounding_ok?: boolean;
     latency_ms?: number;
     attachments?: AttachmentRef[];
+    exports?: ExportFile[];
   } | null;
 };
 
@@ -54,6 +56,7 @@ export type ChatReply = {
   drafts: Draft[];
   citations: Citation[];
   suggestions: string[];
+  exports: ExportFile[];
   meta: {
     intent: string;
     model: string;
