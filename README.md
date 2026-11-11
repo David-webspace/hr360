@@ -167,6 +167,8 @@ cd ../web && npm ci && npm run dev             # http://localhost:3000
 | ![主管簽核](docs/images/approvals.png) | ![假勤帳本](docs/images/leave-ledger.png) |
 | **稽核與模型自檢** | **手機：薪資單** |
 | ![稽核](docs/images/admin.png) | ![手機薪資單](docs/images/mobile-payslip.png) |
+| **浮動聊天室：匯出 Excel** | **稽核助理（只有統計工具）** |
+| ![浮動聊天室中把請假紀錄匯出成 Excel](docs/images/export-floating.png) | ![系統管理員詢問本月拒絕統計](docs/images/auditor-assistant.png) |
 
 ## 說明
 
