@@ -1,10 +1,11 @@
 "use client";
 
 import { createContext, use, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import type { ChatReply, Citation, ConversationSummary, Draft, HistoryMessage, Me, ToolUse } from "@/lib/types";
+import { shrinkImage } from "@/lib/image";
+import type { AttachmentRef, ChatReply, Citation, ConversationSummary, Draft, HistoryMessage, Me, ToolUse } from "@/lib/types";
 
 export type Turn =
-  | { role: "user"; text: string }
+  | { role: "user"; text: string; images: string[] }
   | { role: "assistant"; text: string; drafts: Draft[]; citations: Citation[]; tools: ToolUse[]; latencyMs?: number; groundingOk: boolean }
   | { role: "error"; text: string };
 
@@ -14,9 +15,10 @@ type ChatState = {
   setOpen: (open: boolean) => void;
   turns: Turn[];
   busy: boolean;
+  busyText: string;
   conversationId: number | null;
   conversations: ConversationSummary[];
-  send: (text: string) => Promise<void>;
+  send: (text: string, files?: File[]) => Promise<void>;
   ask: (text: string) => void;
   newConversation: () => void;
   loadConversation: (id: number) => Promise<void>;
@@ -25,16 +27,29 @@ type ChatState = {
 const ChatContext = createContext<ChatState | null>(null);
 // 只記「面板開或關」這種介面偏好；對話內容含薪資等機密，不放在瀏覽器儲存空間
 const OPEN_KEY = "hr360.ai-panel-open";
+const DOC_PROMPT = "請依我上傳的文件幫我請假";
+const imageUrl = (id: string) => `/api/attachments/${id}`;
 
 function toTurns(messages: HistoryMessage[]): Turn[] {
   return messages.map((m) =>
     m.role === "user"
-      ? { role: "user", text: m.text }
+      ? { role: "user", text: m.text, images: (m.meta?.attachments ?? []).map((a) => imageUrl(a.id)) }
       : {
           role: "assistant", text: m.text, drafts: m.meta?.drafts ?? [], citations: m.meta?.citations ?? [],
           tools: m.meta?.tools ?? [], latencyMs: m.meta?.latency_ms, groundingOk: m.meta?.grounding_ok ?? true,
         },
   );
+}
+
+async function upload(file: File): Promise<AttachmentRef | string> {
+  const body = await shrinkImage(file).catch(() => null);
+  if (!body) return `「${file.name}」不是可讀取的圖片`;
+  const res = await fetch(`/api/attachments?name=${encodeURIComponent(file.name)}`, {
+    method: "POST", headers: { "content-type": "image/jpeg" }, body,
+  }).catch(() => null);
+  if (!res) return "上傳失敗，請檢查網路後再試一次";
+  if (!res.ok) return ((await res.json().catch(() => ({}))) as { detail?: string }).detail ?? "上傳失敗";
+  return (await res.json()) as AttachmentRef;
 }
 
 async function getJson<T>(path: string): Promise<T | null> {
@@ -47,6 +62,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const [open, setOpenState] = useState(false);
   const [turns, setTurns] = useState<Turn[]>([]);
   const [busy, setBusy] = useState(false);
+  const [busyText, setBusyText] = useState("");
   const [conversationId, setConversationId] = useState<number | null>(null);
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
   const loaded = useRef(false);
@@ -102,15 +118,26 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener("keydown", onKey);
   }, [open, setOpen]);
 
-  const send = useCallback(async (text: string) => {
-    const message = text.trim();
+  const send = useCallback(async (text: string, files: File[] = []) => {
+    const message = text.trim() || (files.length ? DOC_PROMPT : "");
     if (!message || busy) return;
-    setTurns((t) => [...t, { role: "user", text: message }]);
+    setTurns((t) => [...t, { role: "user", text: message, images: files.map((f) => URL.createObjectURL(f)) }]);
     setBusy(true);
+    setBusyText(files.length ? "上傳並讀取文件中…" : "查詢中…");
+    const uploaded = await Promise.all(files.map(upload));
+    const failed = uploaded.find((u) => typeof u === "string");
+    if (failed) {
+      setBusy(false);
+      setTurns((t) => [...t, { role: "error", text: failed }]);
+      return;
+    }
     const res = await fetch("/api/chat", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ message, conversation_id: conversationId }),
+      body: JSON.stringify({
+        message, conversation_id: conversationId,
+        attachment_ids: uploaded.map((u) => (u as AttachmentRef).id),
+      }),
     }).catch(() => null);
     setBusy(false);
     if (!res || !res.ok) {
@@ -138,7 +165,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <ChatContext value={{ me, open, setOpen, turns, busy, conversationId, conversations, send, ask, newConversation, loadConversation }}>
+    <ChatContext value={{ me, open, setOpen, turns, busy, busyText, conversationId, conversations, send, ask, newConversation, loadConversation }}>
       {children}
     </ChatContext>
   );

@@ -28,6 +28,7 @@ services:
       # make eval 產生的報告與模型分流表寫回主機，重建映像檔不會遺失
       - ./api/eval:/app/eval
       - ./api/config:/app/config
+      - uploads:/app/uploads  # 使用者上傳的證明文件
     depends_on:
       db:
         condition: service_healthy
@@ -49,3 +50,4 @@ services:
 
 volumes:
   pgdata:
+  uploads:

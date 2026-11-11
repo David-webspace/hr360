@@ -17,7 +17,7 @@ hr360 的正確性與權限不依賴模型：數字由計算引擎產生、權�
 
 以下指令在專案資料夾的終端機執行（Windows 用 PowerShell 或命令提示字元皆可）。
 
-`LLM_MODEL_FAST` 用於簡單查詢與意圖分類，`LLM_MODEL_STRONG` 用於分析、多步驟與數字檢查不通過時的重答；兩者可以設成同一個模型。
+`LLM_MODEL_FAST` 用於簡單查詢與意圖分類，`LLM_MODEL_STRONG` 用於分析、多步驟與數字檢查不通過時的重答；兩者可以設成同一個模型。上傳證明文件由 `LLM_MODEL_VISION` 讀取（須支援影像，留空則用 `LLM_MODEL_FAST`）；接入的模型不支援影像時，其他功能不受影響，只是文件會判讀為無法辨識。
 
 ### Claude 官方 API
 
@@ -72,7 +72,7 @@ docker compose exec api python -m app.agent.check
 docker compose exec api python -m app.evals.run --models fast,strong --repeats 2 --write-router
 ```
 
-用目前設定的模型跑完 38 題評測（每題 2 次），產生：
+用目前設定的模型跑完 43 題評測（每題 2 次），產生：
 
 - `api/eval/REPORT.md`：通過率、數字正確率、口徑正確率、越權洩漏率、延遲、成本，以及未通過的題目與原因
 - `api/config/router_table.yaml`：依結果決定每類問題用 fast 還是 strong

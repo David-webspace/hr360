@@ -46,6 +46,8 @@ def evaluate(case: dict, r: ChatResult) -> dict:
         out["draft_ok"] = drafted or asked
     if e.get("no_draft"):
         out["no_draft_ok"] = not r.drafts
+    if "forbid_draft_types" in e:
+        out["no_draft_ok"] = not any(x["leave_type"] in e["forbid_draft_types"] for x in r.drafts)
     if "citations" in e:
         sections = " ".join(c["section"] for c in r.citations)
         out["citation_ok"] = any(c in sections for c in e["citations"])

@@ -4,6 +4,7 @@
 - openai_compatible：Chat Completions function calling（Azure OpenAI、vLLM、Ollama、LiteLLM…）
 """
 
+import base64
 import json
 import re
 from dataclasses import dataclass, field
@@ -59,6 +60,8 @@ class LLMClient(Protocol):
 
     def user(self, text: str) -> Any: ...
 
+    def image_user(self, text: str, image: bytes, media_type: str) -> Any: ...
+
     def assistant_text(self, text: str) -> Any: ...
 
     def system_note(self, text: str) -> Any: ...
@@ -100,6 +103,12 @@ class AnthropicClient:
 
     def user(self, text: str) -> dict:
         return {"role": "user", "content": text}
+
+    def image_user(self, text: str, image: bytes, media_type: str) -> dict:
+        data = base64.b64encode(image).decode()
+        return {"role": "user", "content": [
+            {"type": "image", "source": {"type": "base64", "media_type": media_type, "data": data}},
+            {"type": "text", "text": text}]}
 
     def assistant_text(self, text: str) -> dict:
         return {"role": "assistant", "content": text}
@@ -169,6 +178,10 @@ class OpenAICompatibleClient:
 
     def user(self, text: str) -> dict:
         return {"role": "user", "content": text}
+
+    def image_user(self, text: str, image: bytes, media_type: str) -> dict:
+        url = f"data:{media_type};base64,{base64.b64encode(image).decode()}"
+        return {"role": "user", "content": [{"type": "text", "text": text}, {"type": "image_url", "image_url": {"url": url}}]}
 
     def assistant_text(self, text: str) -> dict:
         return {"role": "assistant", "content": text}

@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 // 示範帳號：讓評估者不用查文件就能切換角色體驗權限差異（密碼見部署時的 SEED_DEMO_PASSWORD）
@@ -13,7 +12,6 @@ const DEMO = [
 ];
 
 export default function LoginPage() {
-  const router = useRouter();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -32,7 +30,8 @@ export default function LoginPage() {
     if (!res) return setError("連不上伺服器，請確認服務已啟動");
     if (!res.ok) return setError(((await res.json().catch(() => ({}))) as { detail?: string }).detail ?? "登入失敗");
     const me = (await res.json()) as { roles: string[] };
-    router.replace(me.roles.includes("sysadmin") && me.roles.length === 1 ? "/admin" : "/");
+    // 同登出：整頁載入，確保不沿用前一位使用者留在瀏覽器記憶體裡的狀態
+    window.location.replace(me.roles.includes("sysadmin") && me.roles.length === 1 ? "/admin" : "/");
   }
 
   return (

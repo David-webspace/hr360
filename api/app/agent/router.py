@@ -48,6 +48,11 @@ def classify_by_rule(question: str) -> str | None:
     return next((intent for intent, pat in RULES if re.search(pat, question)), None)
 
 
+def fixed(intent: str, by: str) -> Route:
+    alias = table()["routes"].get(intent, "strong")
+    return Route(intent, alias, model_for(alias), by, Usage())
+
+
 def route(client: LLMClient, question: str) -> Route:
     usage = Usage()
     intent, by = classify_by_rule(question), "rule"

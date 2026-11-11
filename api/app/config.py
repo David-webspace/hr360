@@ -26,6 +26,7 @@ class Settings(BaseSettings):
     llm_api_key: str | None = None
     llm_model_fast: str = "claude-haiku-5-5"
     llm_model_strong: str = "claude-sonnet-5-5"
+    llm_model_vision: str | None = None  # 讀取上傳文件用；未設定時用 llm_model_fast（該模型須支援影像）
     llm_anthropic_fallbacks: bool = True  # 只在官方 API（未設定 base_url）時生效
     llm_reasoning_effort: str | None = None  # openai_compatible 才用；Ollama 推理模型建議 none
     llm_pricing_file: str = "config/pricing.yaml"
@@ -33,6 +34,8 @@ class Settings(BaseSettings):
 
     chat_rate_per_minute: int = 12
     chat_daily_token_cap: int = 300_000
+    upload_dir: str = "uploads"
+    upload_daily_limit: int = 20
 
     app_today: date | None = None  # 示範資料以 2026-11-10 為基準；未設定時用實際日期
 

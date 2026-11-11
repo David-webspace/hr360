@@ -9,6 +9,9 @@ export type Me = {
   title?: string;
 };
 
+export type AttachmentRef = { id: string; name: string };
+export type DocumentNote = { id?: string; name?: string; summary: string; warnings?: string[] };
+
 export type Draft = {
   draft_id: number;
   employee?: string;
@@ -22,6 +25,7 @@ export type Draft = {
   status: string;
   balance_before?: number;
   balance_after?: number;
+  attachments?: DocumentNote[];
 };
 
 export type Citation = { source: string; section: string; version: string };
@@ -32,7 +36,14 @@ export type ToolUse = { name: string; denied: boolean; error: boolean };
 export type HistoryMessage = {
   role: "user" | "assistant";
   text: string;
-  meta: { drafts: Draft[]; citations: Citation[]; tools: ToolUse[]; grounding_ok: boolean; latency_ms: number } | null;
+  meta: {
+    drafts?: Draft[];
+    citations?: Citation[];
+    tools?: ToolUse[];
+    grounding_ok?: boolean;
+    latency_ms?: number;
+    attachments?: AttachmentRef[];
+  } | null;
 };
 
 export type ConversationSummary = { id: number; title: string | null; last_at: string };
@@ -94,6 +105,7 @@ export type LeaveRow = {
   status: "draft" | "pending" | "approved" | "rejected" | "cancelled";
   reason: string | null;
   created_at: string;
+  attachments?: DocumentNote[];
 };
 
 export type PayslipMonth = { pay_month: string; net: number; paid_on: string };

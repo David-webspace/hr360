@@ -16,7 +16,7 @@ from app.config import TZ, today
 from app.engine.calendar_tw import WorkCalendar, working_hours_between
 from app.engine.leave import LEAVE_TYPES, marriage_leave_days
 from app.policy import PolicyDenied, resolve_employee
-from app.services import ledger
+from app.services import attachments, ledger, tickets
 from app.services.hr import leave_name, num
 
 SELF_SERVICE = ("annual", "comp_time", "birthday", "personal", "family_care", "sick", "menstrual", "marriage",
@@ -65,7 +65,8 @@ def _used_hours(db: Session, emp_id: int, codes: tuple[str, ...], a: date, b: da
     return Fraction(str(v))
 
 
-def _validate(db: Session, e: dict, code: str, start: datetime, end: datetime, exclude: int | None = None) -> dict:
+def _validate(db: Session, e: dict, code: str, start: datetime, end: datetime, exclude: int | None = None,
+              doc_reg: date | None = None) -> dict:
     if code not in SELF_SERVICE:
         raise LeaveError(f"「{leave_name(code) if code in LEAVE_TYPES else code}」需由人資協助辦理，請開立工單")
     if end <= start:
@@ -125,8 +126,13 @@ def _validate(db: Session, e: dict, code: str, start: datetime, end: datetime, e
     elif code == "marriage":
         reg = db.execute(text("SELECT event_date FROM benefit_claims WHERE emp_id = :e AND benefit_code = 'wedding' ORDER BY event_date DESC LIMIT 1"),
                          {"e": e["id"]}).scalar()
+        if reg is None and doc_reg is not None:
+            # 暫用上傳結婚證明讀出的登記日；送出時開工單請人資核對，主管也會看到「待人資核對」
+            reg = doc_reg
+            info["provisional_registration"] = doc_reg
+            info["warnings"].append(f"結婚登記日 {doc_reg} 取自上傳文件，送出後由人資核對")
         if reg is None:
-            raise LeaveError("系統沒有你的結婚登記日，請先檢附結婚證明向人資登錄")
+            raise LeaveError("系統沒有你的結婚登記日，請上傳結婚證明，或先檢附證明向人資登錄")
         ent = marriage_leave_days(reg, 0, extended_window=True)
         used = _used_hours(db, e["id"], ("marriage",), reg - timedelta(days=10), reg + timedelta(days=400), exclude)
         if used + hours > int(ent.value) * 8:
@@ -135,16 +141,20 @@ def _validate(db: Session, e: dict, code: str, start: datetime, end: datetime, e
     return info
 
 
-def draft(db: Session, p: Principal, leave_type: str, start: str, end: str, reason: str | None = None) -> dict:
+def draft(db: Session, p: Principal, leave_type: str, start: str, end: str, reason: str | None = None,
+          attachment_ids: list[str] | None = None) -> dict:
     e = resolve_employee(db, p, None, "S2")
     blocks = _blocks(db, e["schedule_id"])
     s, t = _parse(start, blocks, False), _parse(end, blocks, True)
-    info = _validate(db, e, leave_type, s, t)
+    ids = [a["id"] for a in attachments.owned(db, p, attachment_ids or [])]
+    doc_reg = attachments.registration_date(db, None, ids) if leave_type == "marriage" and ids else None
+    info = _validate(db, e, leave_type, s, t, doc_reg=doc_reg)
     rid = db.execute(text("""
         INSERT INTO leave_requests (emp_id, leave_type, start_at, end_at, hours, reason, status, approver_id, created_via)
         VALUES (:e, :t, :s, :x, :h, :r, 'draft', :a, :via) RETURNING id
     """), {"e": e["id"], "t": leave_type, "s": s, "x": t, "h": float(info["hours"]), "r": reason, "a": e["manager_id"],
            "via": "chat" if p.channel == "web" else p.channel}).scalar_one()
+    attachments.link(db, p, ids, rid)
     db.commit()
     approver = db.execute(text("SELECT name FROM employees WHERE id = :i"), {"i": e["manager_id"]}).scalar()
     card = {"draft_id": rid, "employee": e["name"], "leave_type": leave_type, "leave_name": leave_name(leave_type),
@@ -153,6 +163,9 @@ def draft(db: Session, p: Principal, leave_type: str, start: str, end: str, reas
             "status": "draft", "next_step": "草稿已建立，請本人在畫面上按「確認送出」，送出後才會進入主管簽核"}
     if "balance_before" in info:
         card.update(balance_before=num(info["balance_before"]), balance_after=num(info["balance_after"]))
+    if ids:
+        card["attachments"] = attachments.for_requests(db, [rid]).get(rid, [])
+        card["warnings"] += [w for a in card["attachments"] for w in a["warnings"] if w not in card["warnings"]]
     return card
 
 
@@ -171,11 +184,16 @@ def submit(db: Session, p: Principal, rid: int) -> dict:
     r = _own(db, p, rid, ("draft",))
     e = {"id": r["emp_id"], "birth_date": r["birth_date"], "schedule_id": r["schedule_id"],
          "termination_date": r["termination_date"]}
-    info = _validate(db, e, r["leave_type"], r["start_at"].astimezone(TZ), r["end_at"].astimezone(TZ), exclude=rid)
+    doc_reg = attachments.registration_date(db, rid, []) if r["leave_type"] == "marriage" else None
+    info = _validate(db, e, r["leave_type"], r["start_at"].astimezone(TZ), r["end_at"].astimezone(TZ), exclude=rid,
+                     doc_reg=doc_reg)
     db.execute(text("UPDATE leave_requests SET status = 'pending', created_at = now() WHERE id = :i"), {"i": rid})
     if "alloc" in info:
         ledger.write(db, r["emp_id"], r["leave_type"], info["alloc"], "hold", rid, -1, p.user_id, "送出預扣")
     db.commit()
+    if reg := info.get("provisional_registration"):
+        tickets.create(db, p, "leave", f"請核對結婚登記日：假單 #{rid} 的婚假以上傳結婚證明讀出的登記日 {reg} 計算，"
+                                       "請比對證明文件後登錄到福利申請紀錄")
     return {"id": rid, "status": "pending"}
 
 
@@ -233,7 +251,10 @@ def my_requests(db: Session, p: Principal) -> list[dict]:
 def pending_approvals(db: Session, p: Principal) -> list[dict]:
     # 病假原因屬 S3，主管簽核畫面不顯示
     rows = _rows(db, "r.status = 'pending' AND e.manager_id = :me AND r.emp_id <> :me", {"me": p.emp_id or -1})
+    docs = attachments.for_requests(db, [x["id"] for x in rows])
     for x in rows:
         if x["leave_type"] in ("sick", "menstrual", "prenatal"):
             x["reason"] = None
+        # 主管只看文字摘要，不給原圖連結
+        x["attachments"] = [{"summary": a["summary"]} for a in docs.get(x["id"], [])]
     return rows

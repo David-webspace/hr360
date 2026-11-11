@@ -26,6 +26,8 @@ class ToolContext:
     db: Session
     principal: Principal
     conversation_id: int | None = None
+    # 這一輪使用者上傳的附件；草稿建立時自動附上，模型不需要（也無法）指定附件 id
+    attachment_ids: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -103,7 +105,8 @@ TOOLS: dict[str, Tool] = {t.spec.name: t for t in [
                   _obj({"leave_type": {"type": "string", "enum": list(leave.SELF_SERVICE)},
                         "start": {"type": "string"}, "end": {"type": "string"}, "reason": {"type": "string"}},
                        ["leave_type", "start", "end"])),
-         lambda c, a: leave.draft(c.db, c.principal, a["leave_type"], a["start"], a["end"], a.get("reason")),
+         lambda c, a: leave.draft(c.db, c.principal, a["leave_type"], a["start"], a["end"], a.get("reason"),
+                                  c.attachment_ids),
          action=True),
     Tool(ToolSpec("search_policy", "檢索公司人事規章與 FAQ（工作規則、假勤、薪資、加班、勞健保、福利、旅遊補助、差旅、遠距、績效、育嬰與性平、到離職）。",
                   _obj({"query": {"type": "string"}}, ["query"])),

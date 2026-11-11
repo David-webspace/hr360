@@ -20,7 +20,7 @@ from app.ratelimit import SlidingWindow
 from app import tokens
 from app.mcp_server import http_app as mcp_http_app
 from app.mcp_server import mcp
-from app.services import hr, leave, tickets
+from app.services import attachments, hr, leave, tickets
 
 log = logging.getLogger("hr360")
 
@@ -36,11 +36,18 @@ app = FastAPI(title="hr360", lifespan=lifespan, docs_url="/docs" if settings.ena
 
 login_limit = SlidingWindow(10, 300)
 chat_limit = SlidingWindow(settings.chat_rate_per_minute, 60)
+# 每張上傳的圖都會送進看圖模型（付費），跟聊天分開限流
+upload_limit = SlidingWindow(settings.upload_daily_limit, 86400)
 
 
 @app.exception_handler(PolicyDenied)
 def _denied(_: Request, __: PolicyDenied) -> JSONResponse:
     return JSONResponse({"detail": DENIED}, status_code=404)
+
+
+@app.exception_handler(attachments.AttachmentError)
+def _attachment_error(_: Request, e: attachments.AttachmentError) -> JSONResponse:
+    return JSONResponse({"detail": str(e)}, status_code=400)
 
 
 @app.exception_handler(leave.LeaveError)
@@ -91,6 +98,7 @@ def me(p: Principal = Depends(current_principal), db: Session = Depends(get_db))
 class ChatIn(BaseModel):
     message: str = Field(min_length=1, max_length=2000)
     conversation_id: int | None = None
+    attachment_ids: list[str] = Field(default_factory=list, max_length=3)
 
 
 def _tokens_today(db: Session, user_id: int) -> int:
@@ -108,7 +116,8 @@ def chat(body: ChatIn, p: Principal = Depends(current_principal), db: Session = 
     if _tokens_today(db, p.user_id) >= settings.chat_daily_token_cap:
         raise HTTPException(429, "今日 HR 助理使用量已達上限，請明天再試或洽人資")
     try:
-        r = run_chat(db, get_client(), p, body.message.strip(), body.conversation_id)
+        r = run_chat(db, get_client(), p, body.message.strip(), body.conversation_id,
+                     attachment_ids=body.attachment_ids)
     except Exception:
         db.rollback()
         log.exception("chat failed")
@@ -117,6 +126,25 @@ def chat(body: ChatIn, p: Principal = Depends(current_principal), db: Session = 
             "meta": {"intent": r.intent, "model": r.model, "routed_by": r.routed_by, "grounding_ok": r.grounding_ok,
                      "escalated": r.escalated, "tools": r.tools, "latency_ms": r.latency_ms, "cost_usd": r.cost_usd,
                      "tokens": vars(r.usage)}}
+
+
+@app.post("/api/attachments")
+async def upload_attachment(request: Request, name: str = "", p: Principal = Depends(current_principal),
+                            db: Session = Depends(get_db)) -> dict:
+    # 先看宣稱大小再讀內容，避免把超大檔整個讀進記憶體；讀完再以實際長度檢查一次（宣稱值可以造假）
+    if int(request.headers.get("content-length") or 0) > attachments.MAX_BYTES:
+        raise HTTPException(413, "檔案超過 5MB，請壓縮或重新拍攝")
+    upload_limit.check(str(p.user_id))
+    out = attachments.save(db, p, await request.body(), name)
+    audit.write(db, p, "attachment_upload", question=out["id"])
+    return out
+
+
+@app.get("/api/attachments/{aid}")
+def get_attachment(aid: str, p: Principal = Depends(current_principal), db: Session = Depends(get_db)) -> Response:
+    # no-store：快取的原圖會在同一台電腦換人登入後直接從瀏覽器取出，繞過權限檢查
+    return Response(attachments.image_bytes(attachments.viewable(db, p, aid)), media_type="image/jpeg",
+                    headers={"cache-control": "no-store"})
 
 
 @app.get("/api/conversations")

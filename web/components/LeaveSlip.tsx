@@ -1,9 +1,11 @@
 "use client";
 
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Seal } from "@/components/Seal";
 import { hours, span, STATUS } from "@/lib/format";
+import type { DocumentNote } from "@/lib/types";
 
 type Props = {
   id: number;
@@ -18,6 +20,7 @@ type Props = {
   warnings?: string[];
   reason?: string | null;
   initialStatus?: string;
+  documents?: DocumentNote[];
 };
 
 async function post(path: string, body?: unknown): Promise<string | null> {
@@ -60,6 +63,24 @@ export function LeaveSlip(p: Props) {
   if (p.balance) rows.push(["餘額", <span key="b" className="num">{hours(p.balance.before)} → {hours(p.balance.after)}</span>]);
   if (p.approver) rows.push(["簽核主管", p.approver]);
   if (p.reason) rows.push(["事由", p.reason]);
+  if (p.documents?.length) {
+    rows.push(["證明文件", (
+      <ul key="d" className="space-y-1.5">
+        {p.documents.map((d, i) => (
+          <li key={d.id ?? i} className="flex items-center gap-2">
+            {/* 只有本人（有附件 id）看得到縮圖；主管只拿到判讀摘要 */}
+            {d.id && (
+              <a href={`/api/attachments/${d.id}`} target="_blank" rel="noopener" className="shrink-0">
+                <Image src={`/api/attachments/${d.id}`} alt={d.name ?? "證明文件"} width={40} height={40} unoptimized
+                  className="size-10 rounded border border-rule object-cover" />
+              </a>
+            )}
+            <span className="min-w-0 text-xs break-words">{d.summary}</span>
+          </li>
+        ))}
+      </ul>
+    )]);
+  }
 
   return (
     <article className="w-full max-w-md min-w-0 overflow-hidden rounded-md border border-rule bg-sheet shadow-[0_1px_0_var(--color-rule)]">

@@ -18,6 +18,7 @@ from sqlalchemy.orm import Session
 
 from app.agent.llm import Usage, get_client
 from app.agent.loop import run_chat
+from app.services import attachments
 from app.agent.router import model_for
 from app.agent import audit
 from app.auth import load_principal
@@ -45,7 +46,10 @@ def run_case(case: dict, alias: str, judge_model: str) -> dict:
     try:
         uid = db.execute(text("SELECT id FROM users WHERE username = :u"), {"u": case["user"]}).scalar_one()
         t0 = time.monotonic()
-        r = run_chat(db, client, load_principal(db, uid), case["question"], force_alias=alias)
+        p = load_principal(db, uid)
+        # 附件題：把合成的證明文件圖片走正式的上傳流程（驗證、重新編碼）存進交易，結束時一起回滾
+        ids = [attachments.save(db, p, (ROOT / "fixtures" / f).read_bytes(), f)["id"] for f in case.get("attachments", [])]
+        r = run_chat(db, client, p, case["question"], force_alias=alias, attachment_ids=ids)
         latency = int((time.monotonic() - t0) * 1000)
     finally:
         db.close()

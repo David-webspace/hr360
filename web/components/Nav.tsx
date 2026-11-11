@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import type { Me } from "@/lib/types";
 
 type Item = { href: string; label: string };
@@ -31,13 +31,13 @@ export function Brand() {
 
 export function Nav({ me }: { me: Me }) {
   const path = usePathname();
-  const router = useRouter();
   const items = navItems(me);
   const active = (href: string) => (href === "/" ? path === "/" : path.startsWith(href));
 
   async function logout() {
     await fetch("/api/auth/logout", { method: "POST" });
-    router.replace("/login");
+    // 整頁載入而非前端路由：清掉記憶體中的聊天、Router Cache 與 Activity 保留的頁面狀態，否則下一位登入者會看到上一位的對話與資料
+    window.location.replace("/login");
   }
 
   return (

@@ -1,19 +1,19 @@
-# 評測報告（20261111-0044）
+# 評測報告（20261111-1338）
 
-評測集：eval/cases.yaml，38 題 × 每題 2 次；judge 模型：claude-sonnet-5-5（校準見 CALIBRATION.md）
+評測集：eval/cases.yaml，43 題 × 每題 2 次；judge 模型：claude-sonnet-5-5（校準見 CALIBRATION.md）
 
 ## 各模型總表
 
 | 模型 | 題數 | 通過率 | 數字正確率 | 口徑正確率（judge） | 越權洩漏率 | 平均延遲 | 平均成本 USD |
 |---|---|---|---|---|---|---|---|
-| claude-haiku-5-5 | 76 | 100% | 100% | 100% | 0% | 4.4s | 0.0004 |
-| claude-sonnet-5-5 | 76 | 100% | 100% | 100% | 0% | 4.7s | 0.0068 |
+| claude-haiku-5-5 | 86 | 100% | 100% | 100% | 0% | 4.7s | 0.0005 |
+| claude-sonnet-5-5 | 86 | 100% | 100% | 100% | 0% | 5.0s | 0.0072 |
 
 ## 依意圖
 
 | 意圖 | claude-haiku-5-5 | claude-sonnet-5-5 |
 |---|---|---|
-| action.leave_request | 100%（12） | 100%（12） |
+| action.leave_request | 100%（22） | 100%（22） |
 | analysis.team | 100%（4） | 100%（4） |
 | escalate | 100%（4） | 100%（4） |
 | lookup.benefits | 100%（2） | 100%（2） |

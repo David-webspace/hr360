@@ -68,6 +68,21 @@ class LeaveRequest(Base, Timestamped):
     )
 
 
+class LeaveAttachment(Base, Timestamped):
+    """使用者上傳的證明文件。檔案在磁碟上以 id（uuid）命名，original_name 只拿來顯示。"""
+
+    __tablename__ = "leave_attachments"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    emp_id: Mapped[int | None] = mapped_column(ForeignKey("employees.id"))
+    request_id: Mapped[int | None] = mapped_column(ForeignKey("leave_requests.id"), index=True)
+    original_name: Mapped[str] = mapped_column(String(200))
+    size_bytes: Mapped[int] = mapped_column(Integer)
+    # 模型讀出的欄位（不含病名）＋程式比對結果；只用於建議與顯示，數字仍由計算引擎重算
+    extracted: Mapped[dict | None] = mapped_column(JSONB)
+
+
 class LeaveLedger(Base, Timestamped):
     __tablename__ = "leave_ledger"
 
