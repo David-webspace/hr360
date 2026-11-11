@@ -4,7 +4,7 @@
 
 模型可以換成接入方自己的 AI（Claude、Microsoft Foundry、Azure OpenAI、vLLM、Ollama…），也可以用 MCP 把 hr360 的工具接到既有的 Agent 平台。
 
-![HR 助理建立請假單並送出](docs/images/chat-leave-slip.png)
+![總覽與右側 HR 助理：特休由計算引擎算出並附計算過程](docs/images/overview.png)
 
 ## 啟動
 
@@ -138,9 +138,11 @@ cd ../web && npm ci && npm run dev             # http://localhost:3000
 
 ## 截圖
 
-| 假勤帳本 | 主管簽核 |
+| 對話中建立請假單 | 拍照上傳診斷證明 |
 |---|---|
-| ![假勤帳本](docs/images/leave-ledger.png) | ![主管簽核](docs/images/approvals.png) |
+| ![對話中建立請假單](docs/images/chat-leave-slip.png) | ![上傳診斷證明自動建立病假草稿](docs/images/document-upload.png) |
+| **主管簽核（只看文件判讀摘要）** | **假勤帳本（送出後立即預扣）** |
+| ![主管簽核](docs/images/approvals.png) | ![假勤帳本](docs/images/leave-ledger.png) |
 | **稽核與模型自檢** | **手機：薪資單** |
 | ![稽核](docs/images/admin.png) | ![手機薪資單](docs/images/mobile-payslip.png) |
 
