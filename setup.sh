@@ -26,6 +26,15 @@ ask() {  # ask 變數名 提示 預設值：已有環境變數就直接用；非
   printf -v "$name" '%s' "${value:-$default}"
 }
 
+ask_secret() {  # 同 ask，但輸入不顯示在畫面上，避免旁人或螢幕錄影看到金鑰
+  local name="$1" prompt="$2" value="${!1:-}"
+  if [[ -z "$value" && -t 0 ]]; then
+    read -r -s -p "$prompt（輸入時不會顯示）: " value
+    echo
+  fi
+  printf -v "$name" '%s' "$value"
+}
+
 cp .env.example .env
 PG="$(rand 16)"
 set_kv POSTGRES_PASSWORD "$PG"
@@ -39,19 +48,19 @@ ask CHOICE "請選擇" "4"
 case "$CHOICE" in
   1|anthropic)
     set_kv LLM_PROVIDER anthropic
-    ask LLM_API_KEY "Anthropic API key" ""
+    ask_secret LLM_API_KEY "Anthropic API key"
     set_kv LLM_API_KEY "$LLM_API_KEY" ;;
   2|foundry)
     set_kv LLM_PROVIDER foundry
     ask LLM_FOUNDRY_RESOURCE "Foundry 資源名稱" ""
-    ask LLM_API_KEY "Foundry API key" ""
+    ask_secret LLM_API_KEY "Foundry API key"
     ask LLM_MODEL_FAST "快速模型的部署名稱" "claude-haiku-5-5"
     ask LLM_MODEL_STRONG "強模型的部署名稱" "claude-sonnet-5-5"
     for k in LLM_FOUNDRY_RESOURCE LLM_API_KEY LLM_MODEL_FAST LLM_MODEL_STRONG; do set_kv "$k" "${!k}"; done ;;
   3|openai_compatible)
     set_kv LLM_PROVIDER openai_compatible
     ask LLM_BASE_URL "端點（例如 https://<resource>.openai.azure.com/openai/v1/ 或 http://host.docker.internal:11434/v1）" ""
-    ask LLM_API_KEY "API key（本機模型可留空）" ""
+    ask_secret LLM_API_KEY "API key（本機模型可留空）"
     ask LLM_MODEL_FAST "快速模型名稱" ""
     ask LLM_MODEL_STRONG "強模型名稱" "$LLM_MODEL_FAST"
     for k in LLM_BASE_URL LLM_API_KEY LLM_MODEL_FAST LLM_MODEL_STRONG; do set_kv "$k" "${!k}"; done ;;

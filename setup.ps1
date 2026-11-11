@@ -13,6 +13,13 @@ function Rand([int]$bytes) {
 }
 
 $lines = Get-Content .env.example -Encoding UTF8
+# 金鑰輸入不顯示在畫面上（顯示成 *），避免旁人或螢幕錄影看到
+function ReadSecret([string]$prompt) {
+  $secure = Read-Host $prompt -AsSecureString
+  $ptr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure)
+  try { [Runtime.InteropServices.Marshal]::PtrToStringBSTR($ptr) } finally { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($ptr) }
+}
+
 function SetKv([string]$key, [string]$value) {
   $script:lines = $script:lines | ForEach-Object { if ($_ -like "$key=*") { "$key=$value" } else { $_ } }
 }
@@ -26,18 +33,18 @@ SetKv DATABASE_URL "postgresql+psycopg://hr360:$pg@localhost:5433/hr360"
 Write-Host "要接哪一種模型？ 1) Claude 官方 API  2) Microsoft Foundry 上的 Claude  3) OpenAI 相容端點  4) 先不設定"
 $choice = Read-Host "請選擇 [4]"
 switch ($choice) {
-  "1" { SetKv LLM_PROVIDER anthropic; SetKv LLM_API_KEY (Read-Host "Anthropic API key") }
+  "1" { SetKv LLM_PROVIDER anthropic; SetKv LLM_API_KEY (ReadSecret "Anthropic API key（輸入時不會顯示）") }
   "2" {
     SetKv LLM_PROVIDER foundry
     SetKv LLM_FOUNDRY_RESOURCE (Read-Host "Foundry 資源名稱")
-    SetKv LLM_API_KEY (Read-Host "Foundry API key")
+    SetKv LLM_API_KEY (ReadSecret "Foundry API key（輸入時不會顯示）")
     $f = Read-Host "快速模型的部署名稱 [claude-haiku-5-5]"; if ($f) { SetKv LLM_MODEL_FAST $f }
     $s = Read-Host "強模型的部署名稱 [claude-sonnet-5-5]"; if ($s) { SetKv LLM_MODEL_STRONG $s }
   }
   "3" {
     SetKv LLM_PROVIDER openai_compatible
     SetKv LLM_BASE_URL (Read-Host "端點 URL")
-    SetKv LLM_API_KEY (Read-Host "API key（本機模型可留空）")
+    SetKv LLM_API_KEY (ReadSecret "API key（輸入時不會顯示；本機模型可留空）")
     $f = Read-Host "快速模型名稱"; SetKv LLM_MODEL_FAST $f
     $s = Read-Host "強模型名稱 [$f]"; SetKv LLM_MODEL_STRONG ($(if ($s) { $s } else { $f }))
   }

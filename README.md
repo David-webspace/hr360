@@ -13,8 +13,9 @@
 ### Windows
 
 1. 開啟 Docker Desktop，等左下角顯示 **Engine running**。
-2. 解壓縮（或 `git clone`）後，**雙擊 `start.cmd`**。
-3. 第一次會詢問要接哪個模型（可選「先不設定」），接著自動建置、啟動並開啟瀏覽器 <http://localhost:3000>。
+2. 解壓縮（或 `git clone`）後，**雙擊 `start.cmd`**，第一次會詢問要接哪個模型（可選「先不設定」或接上Claude API Key）。
+3. 服務會自動建置、啟動並開啟瀏覽器 <http://localhost:3000>，即可進入demo，第一次安裝時間大概三分鐘，等待即可。
+4. 點擊角色會自動帶入帳號，密碼為終端機顯示之密碼。
 
 之後再雙擊 `start.cmd` 就是直接啟動。停止服務：在資料夾開啟終端機執行 `docker compose down`。
 
@@ -45,11 +46,29 @@ docker compose up -d --build
 
 ## 接上自己的模型
 
+> **重要：模型設定只有一個地方，就是專案資料夾最外層的 `.env` 檔**（和 `start.cmd` 在同一層，第一次執行 `start.cmd` 後自動產生）。
+>
+> ```text
+> hr360/
+> ├── start.cmd
+> ├── .env        ← 改這個檔
+> ├── README.md
+> └── api/、web/、docs/ …
+> ```
+
 第一次選了「先不設定」，或之後要換模型，都只要三步：
 
-1. 用記事本打開專案資料夾裡的 `.env`。
-2. 依你們的模型，改下表那幾行，存檔。
-3. 再雙擊 `start.cmd`（macOS／Linux：`docker compose up -d`）。系統會套用新設定重啟，資料不受影響。
+1. **打開 `.env`**：在專案資料夾（放 `start.cmd` 的那一層）對 `.env` 按右鍵 →「開啟檔案」→「記事本」。
+   macOS 的 Finder 預設隱藏以 `.` 開頭的檔案，按 `Cmd + Shift + .` 就會顯示。
+2. **改設定、存檔**：依你們的模型，改下表那幾行。以 Claude 官方 API 為例，只要把 key 貼在 `LLM_API_KEY=` 的等號後面：
+
+   ```env
+   LLM_PROVIDER=anthropic
+   LLM_API_KEY=sk-ant-xxxxxxxx
+   ```
+
+   等號前後不要加空白，值也不要加引號。
+3. **再雙擊 `start.cmd`**（macOS／Linux：`docker compose up -d`）：系統會套用新設定重啟，資料不受影響。
 
 | 你們的模型 | 在 `.env` 要改的行 |
 |---|---|
