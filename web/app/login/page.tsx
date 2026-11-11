@@ -63,6 +63,7 @@ export default function LoginPage() {
         <label className="block text-sm text-muted" htmlFor="p">密碼</label>
         <input id="p" type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" required
           className="mt-1 w-full rounded border border-rule px-3 py-2 focus:border-river focus:outline-none" />
+        <p className="mt-1.5 text-xs text-muted break-words">示範帳號密碼：看執行 start.cmd 的黑色視窗最後一行（在工作列上），或專案資料夾 .env 的 SEED_DEMO_PASSWORD。</p>
         {error && <p role="alert" className="mt-3 text-sm text-seal">{error}</p>}
         <button disabled={busy} className="mt-6 w-full rounded bg-river py-2.5 text-white hover:bg-river-deep disabled:opacity-50">
           {busy ? "登入中…" : "登入"}
