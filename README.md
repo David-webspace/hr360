@@ -43,6 +43,25 @@ docker compose up -d --build
 | `sharon.tsai` | 薪酬人員 | 可以查全公司薪資 |
 | `sysadmin` | 系統管理員 | 稽核紀錄、模型用量、模型自檢；看不到任何員工資料 |
 
+## 接上自己的模型
+
+第一次選了「先不設定」，或之後要換模型，都只要三步：
+
+1. 用記事本打開專案資料夾裡的 `.env`。
+2. 依你們的模型，改下表那幾行，存檔。
+3. 再雙擊 `start.cmd`（macOS／Linux：`docker compose up -d`）。系統會套用新設定重啟，資料不受影響。
+
+| 你們的模型 | 在 `.env` 要改的行 |
+|---|---|
+| Claude 官方 API | `LLM_PROVIDER=anthropic`<br>`LLM_API_KEY=sk-ant-...` |
+| Microsoft Foundry 上的 Claude | `LLM_PROVIDER=foundry`<br>`LLM_FOUNDRY_RESOURCE=資源名稱`<br>`LLM_API_KEY=金鑰`<br>`LLM_MODEL_FAST=Haiku 部署名稱`<br>`LLM_MODEL_STRONG=Sonnet 部署名稱` |
+| Azure OpenAI、vLLM、Ollama 等 OpenAI 相容端點 | `LLM_PROVIDER=openai_compatible`<br>`LLM_BASE_URL=端點網址`<br>`LLM_API_KEY=金鑰`<br>`LLM_MODEL_FAST=模型名稱`<br>`LLM_MODEL_STRONG=模型名稱` |
+
+- `LLM_MODEL_FAST` 處理簡單查詢，`LLM_MODEL_STRONG` 處理分析與重答，兩個可以填同一個模型。模型須支援工具呼叫（function calling）。
+- 改完用 `sysadmin` 登入，在「稽核」頁按「執行自檢」確認連線；要知道這個模型能不能上線，跑一次[評測](#評測)。
+- **不要為了重新設定而刪掉 `.env`**：資料庫第一次啟動時已記下 `.env` 裡的密碼，刪掉重產會讓系統連不上資料庫。真的要從頭來，先執行 `docker compose down -v`（會清除所有資料）。
+- 更多細節（Ollama 連主機、推理模型設定、單價表、MCP 接法）見 [docs/INTEGRATION.md](docs/INTEGRATION.md)。
+
 ## 它做什麼
 
 | 情境 | 怎麼處理 |

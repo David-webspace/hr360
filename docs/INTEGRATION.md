@@ -13,7 +13,7 @@ hr360 的正確性與權限不依賴模型：數字由計算引擎產生、權�
 
 ## 2. 設定模型（接法 A）
 
-第一次執行 `start.cmd`（Windows）或 `./setup.sh` 會引導填寫；之後要改，直接編輯 `.env` 再執行 `docker compose up -d` 重啟。
+第一次執行 `start.cmd`（Windows）或 `./setup.sh` 會引導填寫；之後要改，直接編輯 `.env` 再執行 `docker compose up -d` 重啟（Windows 也可以再雙擊 `start.cmd`）。不要刪掉 `.env` 重跑設定：資料庫已記下原本的密碼，重產會連不上；要從頭來先執行 `docker compose down -v`（清除所有資料）。
 
 以下指令在專案資料夾的終端機執行（Windows 用 PowerShell 或命令提示字元皆可）。
 
