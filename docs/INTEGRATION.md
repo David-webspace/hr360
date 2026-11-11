@@ -13,7 +13,9 @@ hr360 的正確性與權限不依賴模型：數字由計算引擎產生、權�
 
 ## 2. 設定模型（接法 A）
 
-執行 `./setup.sh` 會引導填寫；也可以直接編輯 `.env` 後 `docker compose up -d` 重啟 api。
+第一次執行 `start.cmd`（Windows）或 `./setup.sh` 會引導填寫；之後要改，直接編輯 `.env` 再執行 `docker compose up -d` 重啟。
+
+以下指令在專案資料夾的終端機執行（Windows 用 PowerShell 或命令提示字元皆可）。
 
 `LLM_MODEL_FAST` 用於簡單查詢與意圖分類，`LLM_MODEL_STRONG` 用於分析、多步驟與數字檢查不通過時的重答；兩者可以設成同一個模型。
 
@@ -59,7 +61,7 @@ LLM_MODEL_STRONG=<部署或模型名稱>
 ## 3. 確認連線
 
 ```bash
-make check
+docker compose exec api python -m app.agent.check
 ```
 
 或用 `sysadmin` 登入網頁，在「稽核」頁按「執行自檢」。會分別測試 fast、strong 兩個模型的連線、工具呼叫與繁體中文輸出。
@@ -67,7 +69,7 @@ make check
 ## 4. 評測你們的模型
 
 ```bash
-make eval
+docker compose exec api python -m app.evals.run --models fast,strong --repeats 2 --write-router
 ```
 
 用目前設定的模型跑完 38 題評測（每題 2 次），產生：
@@ -90,7 +92,7 @@ docker compose exec api python -m app.evals.run --cases L1,S1 --models fast,stro
 ### 產生權杖
 
 - 網頁：左下角「連接 AI 工具」→ 產生權杖
-- 指令：`make token USER=grace.lin SCOPE=read`
+- 指令：`docker compose exec api python -m app.tokens create grace.lin --scope read`
 
 權杖代表該員工本人，看得到的資料和網頁相同。`read` 只能查詢；`action` 才能建立、送出假單與開立工單。給 AI 自動使用的權杖建議用 `read`。權杖只在產生時顯示一次，資料庫只存雜湊值；最長 90 天，可隨時撤銷。
 
@@ -126,7 +128,7 @@ claude mcp add --transport http hr360 http://localhost:8360/mcp --header "Author
 | 要換的 | 位置 | 做法 |
 |---|---|---|
 | 公司規定（福利金額、補助、加給…） | `api/app/company/policy.py` | 修改參數；`api/tests/test_kb_consistency.py` 會檢查規章文件的數字是否一致 |
-| 規章文件 | `api/kb/*.md` | 依同樣格式（`---` 標頭、`##` 章、`###` 條）撰寫，執行 `make kb` 重新匯入 |
+| 規章文件 | `api/kb/*.md` | 依同樣格式（`---` 標頭、`##` 章、`###` 條）撰寫，執行 `docker compose exec api python -m app.kb.ingest` 重新匯入 |
 | 法規參數 | `api/app/engine/rules.py`、`calendar_tw.py` | 依生效日新增版本，同步更新 `docs/sources.md` 與測試 |
 | 員工與出勤資料 | PostgreSQL | 設 `SEED_ON_START=false`、清空 `APP_TODAY`，再由 HR 系統匯入 `employees`、`org_units`、`leave_ledger` 等資料表（結構見 `api/app/models/`） |
 

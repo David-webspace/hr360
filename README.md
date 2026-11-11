@@ -6,20 +6,31 @@
 
 ![HR 助理建立請假單並送出](docs/images/chat-leave-slip.png)
 
-## 3 分鐘啟動
+## 啟動
 
-需要 Docker（Docker Desktop 或 Docker Engine＋Compose）。
+只需要 [Docker Desktop](https://www.docker.com/products/docker-desktop/)（Windows 需啟用 WSL 2，安裝程式會引導）。不需要安裝 Python、Node.js 或資料庫。
+
+### Windows
+
+1. 開啟 Docker Desktop，等左下角顯示 **Engine running**。
+2. 解壓縮（或 `git clone`）後，**雙擊 `start.cmd`**。
+3. 第一次會詢問要接哪個模型（可選「先不設定」），接著自動建置、啟動並開啟瀏覽器 <http://localhost:3000>。
+
+之後再雙擊 `start.cmd` 就是直接啟動。停止服務：在資料夾開啟終端機執行 `docker compose down`。
+
+### macOS／Linux
 
 ```bash
-git clone <repo> hr360 && cd hr360
-./setup.sh              # Windows：.\setup.ps1
+./setup.sh
 docker compose up -d --build
 ```
 
-- `setup.sh` 會自動產生資料庫密碼、登入金鑰與示範帳號密碼，只問要接哪個模型；選「先不設定」也能啟動，只有 HR 助理聊天會提示尚未接上模型。
-- 第一次啟動會自動建立資料表、產生示範資料、匯入規章知識庫（約 10 秒）。
-- 開啟 <http://localhost:3000>，用下表的示範帳號登入；密碼在 `.env` 的 `SEED_DEMO_PASSWORD`。
-- 啟動後跑 `make check`（或用 `sysadmin` 登入按「執行自檢」）確認模型連線、工具呼叫、繁中輸出都正常。
+### 說明
+
+- 設定步驟會自動產生資料庫密碼、登入金鑰與示範帳號密碼，只問要接哪個模型；選「先不設定」也能啟動，只有 HR 助理聊天會提示尚未接上模型。
+- 第一次建置需要網路（下載 Docker 映像檔與套件），約 1–5 分鐘；之後啟動只要幾秒。第一次啟動會自動建立資料表、產生示範資料、匯入規章知識庫。
+- 用下表的示範帳號登入；密碼會顯示在啟動視窗，也記在 `.env` 的 `SEED_DEMO_PASSWORD`。
+- 用 `sysadmin` 登入，在「稽核」頁按「執行自檢」，確認模型連線、工具呼叫、繁中輸出都正常。
 
 | 帳號 | 角色 | 可以試試 |
 |---|---|---|
@@ -68,7 +79,8 @@ docker compose up -d --build
 模型分流表 [api/config/router_table.yaml](api/config/router_table.yaml) 由評測產生：每個意圖選「每次都通過、零洩漏、且至少 3 題」中最便宜的模型。目前查假、加班費、薪資、請假、規章走 Haiku；團隊分析、轉人工、福利題數不足，維持 Sonnet。
 
 ```bash
-make eval    # 用目前設定的模型重跑評測、更新分流表（會呼叫模型、產生費用）
+# 用目前設定的模型重跑評測、更新分流表（會呼叫模型、產生費用）
+docker compose exec api python -m app.evals.run --models fast,strong --repeats 2 --write-router
 ```
 
 ## Token 與成本
@@ -92,9 +104,10 @@ make eval    # 用目前設定的模型重跑評測、更新分流表（會呼�
 
 ```
 hr360/
+├── start.cmd                Windows 雙擊啟動
 ├── setup.sh / setup.ps1     產生 .env
 ├── docker-compose.yml       db（PostgreSQL 16＋pgvector）、api、web
-├── Makefile                 setup / up / check / seed / kb / token / eval / test
+├── Makefile                 macOS／Linux 常用指令捷徑
 ├── docs/                    架構、接入指南、法規出處、截圖
 ├── api/                     FastAPI（Python 3.12）
 │   ├── app/engine/          勞動法令計算引擎（純函式）

@@ -1,4 +1,5 @@
-﻿# Windows 版：產生 .env（自動填好密碼與金鑰，只問模型設定）。用法：.\setup.ps1  或  .\setup.ps1 -Force
+﻿# Windows 版：產生 .env（自動填好密碼與金鑰，只問模型設定）。
+# 一般直接雙擊 start.cmd 即可；單獨執行：powershell -ExecutionPolicy Bypass -File .\setup.ps1 [-Force]
 param([switch]$Force)
 $ErrorActionPreference = "Stop"
 Set-Location $PSScriptRoot
@@ -43,6 +44,7 @@ switch ($choice) {
   default { Write-Host "先不設定模型：系統照常啟動，HR 助理聊天會提示尚未設定。" }
 }
 
-$lines | Set-Content .env -Encoding UTF8
+# 不用 Set-Content -Encoding UTF8：Windows PowerShell 5.1 會加 BOM，Docker Compose 讀 .env 會出錯
+[System.IO.File]::WriteAllLines((Join-Path $PSScriptRoot ".env"), [string[]]$lines, (New-Object System.Text.UTF8Encoding $false))
 Write-Host "`n完成。接下來：docker compose up -d --build，開啟 http://localhost:3000"
 Write-Host "示範帳號密碼：$demo（也記在 .env 的 SEED_DEMO_PASSWORD）"
